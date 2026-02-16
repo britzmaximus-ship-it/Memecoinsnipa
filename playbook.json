@@ -41,56 +41,8 @@
       "note": "**\n\n* ADDED: Prioritize tokens with strong buy pressure and whale accumulation.\n* MODIFIED: Be more cautious with tokens that have similar patterns to past losing picks.\n* REMOVED: None\n\n**"
     }
   ],
-  "scans": 22,
+  "scans": 23,
   "tokens_seen": [
-    {
-      "name": "Bob Lazar (LAZAR)",
-      "date": "2026-02-16T12:03"
-    },
-    {
-      "name": "Mog Coin (MOG)",
-      "date": "2026-02-16T12:03"
-    },
-    {
-      "name": "MELON MUSK (MELON)",
-      "date": "2026-02-16T12:03"
-    },
-    {
-      "name": "Rizzmadan (Rizzmadan)",
-      "date": "2026-02-16T12:03"
-    },
-    {
-      "name": "SpaceX Grok (spok)",
-      "date": "2026-02-16T12:03"
-    },
-    {
-      "name": "Wealth Mogging (WEALTHMOG)",
-      "date": "2026-02-16T12:03"
-    },
-    {
-      "name": "we're curing cancer, right? (right)",
-      "date": "2026-02-16T12:03"
-    },
-    {
-      "name": "\u30d4\u30fc\u30bf\u3055\u3093 (PETAH)",
-      "date": "2026-02-16T12:03"
-    },
-    {
-      "name": "OTOME (OTOME)",
-      "date": "2026-02-16T14:34"
-    },
-    {
-      "name": "Mochi Panda (Mochi)",
-      "date": "2026-02-16T14:34"
-    },
-    {
-      "name": "b\u01d0ngw\u01d4 (\u4e19\u5348)",
-      "date": "2026-02-16T14:34"
-    },
-    {
-      "name": "Punch\u2019s Father (KOSUKE)",
-      "date": "2026-02-16T14:34"
-    },
     {
       "name": "Frog CEO (FROGCEO)",
       "date": "2026-02-16T14:34"
@@ -842,101 +794,58 @@
     {
       "name": "we're curing cancer, right? (right)",
       "date": "2026-02-16T20:18"
+    },
+    {
+      "name": "b\u01d0ngw\u01d4 (\u4e19\u5348)",
+      "date": "2026-02-16T20:18"
+    },
+    {
+      "name": "Punch\u2019s Father (KOSUKE)",
+      "date": "2026-02-16T20:18"
+    },
+    {
+      "name": "Clavicular (Clav)",
+      "date": "2026-02-16T20:18"
+    },
+    {
+      "name": "firewu (FIREWU)",
+      "date": "2026-02-16T20:18"
+    },
+    {
+      "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
+      "date": "2026-02-16T20:18"
+    },
+    {
+      "name": "\u30de\u30de\u30f3 (Maman)",
+      "date": "2026-02-16T20:18"
+    },
+    {
+      "name": "ORGAZM (ORGAZM)",
+      "date": "2026-02-16T20:18"
+    },
+    {
+      "name": "Mog Coin (MOG)",
+      "date": "2026-02-16T20:18"
+    },
+    {
+      "name": "SpaceX Grok (spok)",
+      "date": "2026-02-16T20:18"
+    },
+    {
+      "name": "MELON MUSK (MELON)",
+      "date": "2026-02-16T20:18"
+    },
+    {
+      "name": "Wealth Mogging (WEALTHMOG)",
+      "date": "2026-02-16T20:18"
+    },
+    {
+      "name": "we're curing cancer, right? (right)",
+      "date": "2026-02-16T20:18"
     }
   ],
   "last_scan": "2026-02-16T20:18",
-  "active_picks": [
-    {
-      "name": "ORGAZM",
-      "symbol": "ORGAZM",
-      "contract": "HisdZJZZ9MZvWCkuENFjp1yhzhemHEB52W3aYUXJpump",
-      "entry_price": 8.083e-06,
-      "confidence": 8,
-      "reason": "Strong buy pressure, Vol spike 3.96x",
-      "picked_at": "2026-02-16T18:39",
-      "scans_tracked": 11,
-      "peak_price": 8.083e-06,
-      "lowest_price": 6.983e-06,
-      "entry_snapshot": {
-        "market_cap": 8083.81,
-        "mc_tier": "micro (<100k)",
-        "liquidity": 0.0,
-        "liq_to_mc_ratio": 0.0,
-        "volume_1h": 3429.04,
-        "volume_24h": 20766.35,
-        "vol_spike": 3.96,
-        "vol_tier": "high_spike",
-        "buy_ratio_1h": 1.5,
-        "pressure_tier": "strong_buying",
-        "price_change_1h": 46.96,
-        "price_change_6h": 6.08,
-        "price_change_24h": 389.0,
-        "dex": "pumpfun",
-        "hours_old": 24.1,
-        "source": "scan"
-      }
-    },
-    {
-      "name": "Punch\u2019s Father",
-      "symbol": "KOSUKE",
-      "contract": "62eFhsfHF5FnYnd1cmodYa8SfSwxJnJk5BrSwMh2pump",
-      "entry_price": 6.93e-06,
-      "confidence": 7,
-      "reason": "Strong buy pressure, Whale accumulation",
-      "picked_at": "2026-02-16T18:39",
-      "scans_tracked": 11,
-      "peak_price": 1.249e-05,
-      "lowest_price": 6.551e-06,
-      "entry_snapshot": {
-        "market_cap": 6930.0,
-        "mc_tier": "micro (<100k)",
-        "liquidity": 6701.11,
-        "liq_to_mc_ratio": 0.967,
-        "volume_1h": 323.31,
-        "volume_24h": 560146.45,
-        "vol_spike": 0.01,
-        "vol_tier": "normal",
-        "buy_ratio_1h": 1.5,
-        "pressure_tier": "strong_buying",
-        "price_change_1h": 10.19,
-        "price_change_6h": -17.0,
-        "price_change_24h": -80.39,
-        "dex": "pumpswap",
-        "hours_old": 18.2,
-        "source": "scan"
-      }
-    },
-    {
-      "name": "Crow with cigarette",
-      "symbol": "SmokinCrow",
-      "contract": "6ntVRHQKVsvizpHAwVhwrkvW8pgSUmFyZ4gAVwh6pump",
-      "entry_price": 0.0005618,
-      "confidence": 6,
-      "reason": "Strong buy pressure, Vol spike 3.28x, Whale accumulation",
-      "picked_at": "2026-02-16T18:39",
-      "scans_tracked": 11,
-      "peak_price": 0.001083,
-      "lowest_price": 3.098e-06,
-      "entry_snapshot": {
-        "market_cap": 561831.0,
-        "mc_tier": "mid (500k-2M)",
-        "liquidity": 60496.38,
-        "liq_to_mc_ratio": 0.1077,
-        "volume_1h": 117842.42,
-        "volume_24h": 861521.56,
-        "vol_spike": 3.28,
-        "vol_tier": "high_spike",
-        "buy_ratio_1h": 1.85,
-        "pressure_tier": "strong_buying",
-        "price_change_1h": 16.1,
-        "price_change_6h": 70.06,
-        "price_change_24h": 1466.0,
-        "dex": "pumpswap",
-        "hours_old": 10.1,
-        "source": "scan"
-      }
-    }
-  ],
+  "active_picks": [],
   "pick_history": [
     {
       "name": "Punch\u2019s Father",
@@ -1532,17 +1441,122 @@
       "peak_return_pct": 10.5,
       "result": "LOSS",
       "closed_at": "2026-02-16T20:18"
+    },
+    {
+      "name": "ORGAZM",
+      "symbol": "ORGAZM",
+      "contract": "HisdZJZZ9MZvWCkuENFjp1yhzhemHEB52W3aYUXJpump",
+      "entry_price": 8.083e-06,
+      "confidence": 8,
+      "reason": "Strong buy pressure, Vol spike 3.96x",
+      "picked_at": "2026-02-16T18:39",
+      "scans_tracked": 12,
+      "peak_price": 8.083e-06,
+      "lowest_price": 6.983e-06,
+      "entry_snapshot": {
+        "market_cap": 8083.81,
+        "mc_tier": "micro (<100k)",
+        "liquidity": 0.0,
+        "liq_to_mc_ratio": 0.0,
+        "volume_1h": 3429.04,
+        "volume_24h": 20766.35,
+        "vol_spike": 3.96,
+        "vol_tier": "high_spike",
+        "buy_ratio_1h": 1.5,
+        "pressure_tier": "strong_buying",
+        "price_change_1h": 46.96,
+        "price_change_6h": 6.08,
+        "price_change_24h": 389.0,
+        "dex": "pumpfun",
+        "hours_old": 24.1,
+        "source": "scan"
+      },
+      "final_price": 6.983e-06,
+      "return_pct": -13.6,
+      "peak_return_pct": 0.0,
+      "result": "LOSS",
+      "closed_at": "2026-02-16T20:18"
+    },
+    {
+      "name": "Punch\u2019s Father",
+      "symbol": "KOSUKE",
+      "contract": "62eFhsfHF5FnYnd1cmodYa8SfSwxJnJk5BrSwMh2pump",
+      "entry_price": 6.93e-06,
+      "confidence": 7,
+      "reason": "Strong buy pressure, Whale accumulation",
+      "picked_at": "2026-02-16T18:39",
+      "scans_tracked": 12,
+      "peak_price": 1.249e-05,
+      "lowest_price": 6.551e-06,
+      "entry_snapshot": {
+        "market_cap": 6930.0,
+        "mc_tier": "micro (<100k)",
+        "liquidity": 6701.11,
+        "liq_to_mc_ratio": 0.967,
+        "volume_1h": 323.31,
+        "volume_24h": 560146.45,
+        "vol_spike": 0.01,
+        "vol_tier": "normal",
+        "buy_ratio_1h": 1.5,
+        "pressure_tier": "strong_buying",
+        "price_change_1h": 10.19,
+        "price_change_6h": -17.0,
+        "price_change_24h": -80.39,
+        "dex": "pumpswap",
+        "hours_old": 18.2,
+        "source": "scan"
+      },
+      "final_price": 1.227e-05,
+      "return_pct": 77.1,
+      "peak_return_pct": 80.2,
+      "result": "SMALL WIN",
+      "closed_at": "2026-02-16T20:18"
+    },
+    {
+      "name": "Crow with cigarette",
+      "symbol": "SmokinCrow",
+      "contract": "6ntVRHQKVsvizpHAwVhwrkvW8pgSUmFyZ4gAVwh6pump",
+      "entry_price": 0.0005618,
+      "confidence": 6,
+      "reason": "Strong buy pressure, Vol spike 3.28x, Whale accumulation",
+      "picked_at": "2026-02-16T18:39",
+      "scans_tracked": 12,
+      "peak_price": 0.001083,
+      "lowest_price": 3.098e-06,
+      "entry_snapshot": {
+        "market_cap": 561831.0,
+        "mc_tier": "mid (500k-2M)",
+        "liquidity": 60496.38,
+        "liq_to_mc_ratio": 0.1077,
+        "volume_1h": 117842.42,
+        "volume_24h": 861521.56,
+        "vol_spike": 3.28,
+        "vol_tier": "high_spike",
+        "buy_ratio_1h": 1.85,
+        "pressure_tier": "strong_buying",
+        "price_change_1h": 16.1,
+        "price_change_6h": 70.06,
+        "price_change_24h": 1466.0,
+        "dex": "pumpswap",
+        "hours_old": 10.1,
+        "source": "scan"
+      },
+      "final_price": 3.49e-06,
+      "return_pct": -99.4,
+      "peak_return_pct": 92.8,
+      "result": "LOSS",
+      "closed_at": "2026-02-16T20:18"
     }
   ],
   "performance": {
-    "total_picks": 17,
-    "wins": 5,
-    "losses": 11,
+    "total_picks": 20,
+    "wins": 6,
+    "losses": 13,
     "neutral": 1,
-    "avg_return_pct": -16.1,
+    "avg_return_pct": -15.5,
     "best_pick": {
       "name": "Punch\u2019s Father",
-      "return_pct": 51.5
+      "return_pct": 77.1
     },
     "worst_pick": {
       "name": "Mochi Panda (Mochi)",
@@ -1554,7 +1568,8 @@
     "Mog Coin: +51.1% (small win). Reason: High volume spike, Strong buy ratio, Low market cap",
     "Punch\u2019s Father: +51.5% (small win). Reason: NEW pair, heavy buy pressure, and low market cap",
     "Mog Coin: +39.7% (small win). Reason: NEW, whale accumulation, strong buy pressure, and recent price surge",
-    "Frog CEO: +36.8% (small win). Reason: NEW, recent price surge, and good liquidity relative to market cap"
+    "Frog CEO: +36.8% (small win). Reason: NEW, recent price surge, and good liquidity relative to market cap",
+    "Punch\u2019s Father: +77.1% (small win). Reason: Strong buy pressure, Whale accumulation"
   ],
   "lose_patterns": [
     "Bob Lazar: -23.4% loss. Peak was +0.0%. Reason picked: NEW pair, strong buy pressure, and low market cap",
@@ -1567,7 +1582,9 @@
     "Clavicular (Clav): -11.1% loss. Peak was +6.7%. Reason picked: High volume spike, relatively low market cap, and strong recent price action",
     "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY): -20.5% loss. Peak was +40.4%. Reason picked: Strong buy pressure, Vol spike 5.68x, NEW PAIR",
     "Crow with cigarette (SmokinCrow): -99.2% loss. Peak was +135.1%. Reason picked: HEAVY buy pressure, Vol spike 3.6x, Whale accumulation, NEW PAIR",
-    "Clavicular (Clav): -45.4% loss. Peak was +10.5%. Reason picked: NEW PAIR, Vol spike 24.0x, Strong recent price action"
+    "Clavicular (Clav): -45.4% loss. Peak was +10.5%. Reason picked: NEW PAIR, Vol spike 24.0x, Strong recent price action",
+    "ORGAZM: -13.6% loss. Peak was +0.0%. Reason picked: Strong buy pressure, Vol spike 3.96x",
+    "Crow with cigarette: -99.4% loss. Peak was +92.8%. Reason picked: Strong buy pressure, Vol spike 3.28x, Whale accumulation"
   ],
   "strategy_rules": [
     "Prioritize micro cap tokens (<100k) - these averaged +14.7% ROI with a 60.0% win rate",
@@ -1579,7 +1596,8 @@
     "Avoid tokens older than 24h - only 1 trade older than 24h was profitable"
   ],
   "avoid_conditions": [
-    "AVOID tokens already pumped >100% in 1h (lost -29.8% on \u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY))"
+    "AVOID tokens already pumped >100% in 1h (lost -29.8% on \u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY))",
+    "AVOID tokens with liq/MC ratio <5% (thin liquidity trap, lost on ORGAZM)"
   ],
   "mistake_log": [
     {
@@ -1684,13 +1702,33 @@
       "confidence_was": 7,
       "lesson": "Lost -45.4% on Clavicular (Clav). No obvious warning signs at entry - may be random market conditions",
       "conditions": []
+    },
+    {
+      "date": "2026-02-16",
+      "token": "ORGAZM",
+      "return_pct": -13.6,
+      "confidence_was": 8,
+      "lesson": "Lost -13.6% on ORGAZM. Warning signs: very low liquidity-to-MC ratio (thin exit)",
+      "conditions": [
+        "very low liquidity-to-MC ratio (thin exit)"
+      ]
+    },
+    {
+      "date": "2026-02-16",
+      "token": "Crow with cigarette",
+      "return_pct": -99.4,
+      "confidence_was": 6,
+      "lesson": "Lost -99.4% on Crow with cigarette. Warning signs: token had already pumped 500%+ in 24h",
+      "conditions": [
+        "token had already pumped 500%+ in 24h"
+      ]
     }
   ],
   "roi_tiers": {
     "MC_micro (<100k)": {
-      "avg_roi": -2.1,
-      "count": 10,
-      "win_rate": 30.0
+      "avg_roi": 3.5,
+      "count": 12,
+      "win_rate": 33.3
     },
     "MC_small (100k-500k)": {
       "avg_roi": -27.4,
@@ -1698,14 +1736,14 @@
       "win_rate": 40.0
     },
     "MC_mid (500k-2M)": {
-      "avg_roi": -57.8,
-      "count": 2,
+      "avg_roi": -71.6,
+      "count": 3,
       "win_rate": 0.0
     },
     "Vol_normal": {
-      "avg_roi": -2.7,
-      "count": 7,
-      "win_rate": 42.9
+      "avg_roi": 7.2,
+      "count": 8,
+      "win_rate": 50.0
     },
     "Vol_moderate": {
       "avg_roi": -9.5,
@@ -1715,6 +1753,11 @@
     "Vol_extreme_spike": {
       "avg_roi": -23.4,
       "count": 5,
+      "win_rate": 0.0
+    },
+    "Vol_high_spike": {
+      "avg_roi": -70.7,
+      "count": 3,
       "win_rate": 0.0
     },
     "Pressure_heavy_buying": {
@@ -1728,18 +1771,23 @@
       "win_rate": 33.3
     },
     "Pressure_strong_buying": {
-      "avg_roi": -12.6,
-      "count": 6,
-      "win_rate": 16.7
+      "avg_roi": -12.4,
+      "count": 9,
+      "win_rate": 22.2
     },
     "Age_6-24h": {
-      "avg_roi": -12.8,
-      "count": 11,
-      "win_rate": 45.5
+      "avg_roi": -12.5,
+      "count": 13,
+      "win_rate": 46.2
     },
     "Age_1-6h": {
       "avg_roi": -20.2,
       "count": 3,
+      "win_rate": 0.0
+    },
+    "Age_24h+": {
+      "avg_roi": -14.7,
+      "count": 2,
       "win_rate": 0.0
     },
     "Age_<1h": {
@@ -2190,14 +2238,92 @@
       "entry_price_change_1h": 52.23,
       "entry_age_hours": 0.9,
       "entry_dex": "pumpswap"
+    },
+    {
+      "name": "ORGAZM",
+      "symbol": "ORGAZM",
+      "contract": "HisdZJZZ9MZvWCkuENFjp1yhzhemHEB52W3aYUXJpump",
+      "entry_price": 8.083e-06,
+      "exit_price": 6.983e-06,
+      "return_pct": -13.6,
+      "peak_return_pct": 0.0,
+      "result": "LOSS",
+      "confidence_at_pick": 8,
+      "reason": "Strong buy pressure, Vol spike 3.96x",
+      "picked_at": "2026-02-16T18:39",
+      "closed_at": "2026-02-16T20:18",
+      "scans_held": 12,
+      "entry_market_cap": 8083.81,
+      "entry_mc_tier": "micro (<100k)",
+      "entry_liquidity": 0.0,
+      "entry_liq_ratio": 0.0,
+      "entry_vol_spike": 3.96,
+      "entry_vol_tier": "high_spike",
+      "entry_buy_ratio": 1.5,
+      "entry_pressure": "strong_buying",
+      "entry_price_change_1h": 46.96,
+      "entry_age_hours": 24.1,
+      "entry_dex": "pumpfun"
+    },
+    {
+      "name": "Punch\u2019s Father",
+      "symbol": "KOSUKE",
+      "contract": "62eFhsfHF5FnYnd1cmodYa8SfSwxJnJk5BrSwMh2pump",
+      "entry_price": 6.93e-06,
+      "exit_price": 1.227e-05,
+      "return_pct": 77.1,
+      "peak_return_pct": 80.2,
+      "result": "SMALL WIN",
+      "confidence_at_pick": 7,
+      "reason": "Strong buy pressure, Whale accumulation",
+      "picked_at": "2026-02-16T18:39",
+      "closed_at": "2026-02-16T20:18",
+      "scans_held": 12,
+      "entry_market_cap": 6930.0,
+      "entry_mc_tier": "micro (<100k)",
+      "entry_liquidity": 6701.11,
+      "entry_liq_ratio": 0.967,
+      "entry_vol_spike": 0.01,
+      "entry_vol_tier": "normal",
+      "entry_buy_ratio": 1.5,
+      "entry_pressure": "strong_buying",
+      "entry_price_change_1h": 10.19,
+      "entry_age_hours": 18.2,
+      "entry_dex": "pumpswap"
+    },
+    {
+      "name": "Crow with cigarette",
+      "symbol": "SmokinCrow",
+      "contract": "6ntVRHQKVsvizpHAwVhwrkvW8pgSUmFyZ4gAVwh6pump",
+      "entry_price": 0.0005618,
+      "exit_price": 3.49e-06,
+      "return_pct": -99.4,
+      "peak_return_pct": 92.8,
+      "result": "LOSS",
+      "confidence_at_pick": 6,
+      "reason": "Strong buy pressure, Vol spike 3.28x, Whale accumulation",
+      "picked_at": "2026-02-16T18:39",
+      "closed_at": "2026-02-16T20:18",
+      "scans_held": 12,
+      "entry_market_cap": 561831.0,
+      "entry_mc_tier": "mid (500k-2M)",
+      "entry_liquidity": 60496.38,
+      "entry_liq_ratio": 0.1077,
+      "entry_vol_spike": 3.28,
+      "entry_vol_tier": "high_spike",
+      "entry_buy_ratio": 1.85,
+      "entry_pressure": "strong_buying",
+      "entry_price_change_1h": 16.1,
+      "entry_age_hours": 10.1,
+      "entry_dex": "pumpswap"
     }
   ],
   "pattern_stats": {
     "by_mc_tier": {
       "micro (<100k)": {
-        "total": 10,
-        "wins": 3,
-        "losses": 6,
+        "total": 12,
+        "wins": 4,
+        "losses": 7,
         "returns": [
           39.8,
           51.5,
@@ -2208,7 +2334,9 @@
           -10.4,
           -11.1,
           -20.5,
-          -45.4
+          -45.4,
+          -13.6,
+          77.1
         ]
       },
       "small (100k-500k)": {
@@ -2224,19 +2352,20 @@
         ]
       },
       "mid (500k-2M)": {
-        "total": 2,
+        "total": 3,
         "wins": 0,
-        "losses": 2,
+        "losses": 3,
         "returns": [
           -99.7,
-          -15.8
+          -15.8,
+          -99.4
         ]
       }
     },
     "by_vol_tier": {
       "normal": {
-        "total": 7,
-        "wins": 3,
+        "total": 8,
+        "wins": 4,
         "losses": 3,
         "returns": [
           39.8,
@@ -2245,7 +2374,8 @@
           -23.4,
           -31.4,
           -99.7,
-          -7.1
+          -7.1,
+          77.1
         ]
       },
       "moderate": {
@@ -2272,11 +2402,13 @@
         ]
       },
       "high_spike": {
-        "total": 1,
+        "total": 3,
         "wins": 0,
-        "losses": 1,
+        "losses": 3,
         "returns": [
-          -99.2
+          -99.2,
+          -13.6,
+          -99.4
         ]
       }
     },
@@ -2307,24 +2439,27 @@
         ]
       },
       "strong_buying": {
-        "total": 6,
-        "wins": 1,
-        "losses": 5,
+        "total": 9,
+        "wins": 2,
+        "losses": 7,
         "returns": [
           -23.4,
           -31.4,
           39.7,
           -29.8,
           -10.4,
-          -20.5
+          -20.5,
+          -13.6,
+          77.1,
+          -99.4
         ]
       }
     },
     "by_age_group": {
       "6-24h": {
-        "total": 11,
-        "wins": 5,
-        "losses": 5,
+        "total": 13,
+        "wins": 6,
+        "losses": 6,
         "returns": [
           39.8,
           51.1,
@@ -2336,7 +2471,9 @@
           36.8,
           -99.7,
           -7.1,
-          -99.2
+          -99.2,
+          77.1,
+          -99.4
         ]
       },
       "1-6h": {
@@ -2365,13 +2502,21 @@
           -11.1,
           -45.4
         ]
+      },
+      "1-3d": {
+        "total": 1,
+        "wins": 0,
+        "losses": 1,
+        "returns": [
+          -13.6
+        ]
       }
     },
     "by_source": {
       "scan": {
-        "total": 17,
-        "wins": 5,
-        "losses": 11,
+        "total": 20,
+        "wins": 6,
+        "losses": 13,
         "returns": [
           39.8,
           51.1,
@@ -2389,7 +2534,10 @@
           -11.1,
           -20.5,
           -99.2,
-          -45.4
+          -45.4,
+          -13.6,
+          77.1,
+          -99.4
         ]
       }
     }
@@ -2417,7 +2565,7 @@
       "last_update": "2026-02-16T20:18",
       "peak_price": 8.095206999999999e-06,
       "lowest_price": 6.983e-06,
-      "scans_monitored": 10,
+      "scans_monitored": 11,
       "updates": [
         {
           "scan": 1,
@@ -2488,6 +2636,13 @@
           "action": "HOLD",
           "reason": "Monitoring (-13.7%)",
           "time": "2026-02-16T20:18"
+        },
+        {
+          "scan": 11,
+          "price": 6.983e-06,
+          "action": "HOLD",
+          "reason": "Monitoring (-13.7%)",
+          "time": "2026-02-16T20:18"
         }
       ],
       "entry_snapshot": {
@@ -2535,7 +2690,7 @@
       "last_update": "2026-02-16T20:18",
       "peak_price": 1.249e-05,
       "lowest_price": 6.551e-06,
-      "scans_monitored": 10,
+      "scans_monitored": 11,
       "updates": [
         {
           "scan": 1,
@@ -2602,6 +2757,13 @@
         },
         {
           "scan": 10,
+          "price": 1.227e-05,
+          "action": "HOLD",
+          "reason": "Monitoring (+75.5%)",
+          "time": "2026-02-16T20:18"
+        },
+        {
+          "scan": 11,
           "price": 1.227e-05,
           "action": "HOLD",
           "reason": "Monitoring (+75.5%)",
@@ -2687,5 +2849,5 @@
   },
   "paper_trade_id_counter": 3,
   "pending_paper_trades": [],
-  "last_update_id": 574228904
+  "last_update_id": 574228905
 }
