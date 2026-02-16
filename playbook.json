@@ -7,9 +7,13 @@
     {
       "date": "2026-02-16",
       "note": "- I'll add a new rule to prioritize tokens with strong buy pressure and WHALE accumulation.\n- I'll modify my rule to be more cautious with tokens that have similar patterns to my past losing picks."
+    },
+    {
+      "date": "2026-02-16",
+      "note": "I'll add a new rule to prioritize tokens with strong buy pressure and whale accumulation. I'll modify my rule to be more cautious with tokens that have similar patterns to my past losing picks."
     }
   ],
-  "scans": 2,
+  "scans": 3,
   "tokens_seen": [
     {
       "name": "\u30b8\u30e5\u30f3\u30b2\u30eb\u30b9\u30b3\u30b0 (DJUNG)",
@@ -106,9 +110,57 @@
     {
       "name": "we're curing cancer, right? (right)",
       "date": "2026-02-16T08:32"
+    },
+    {
+      "name": "\u30b8\u30e5\u30f3\u30b2\u30eb\u30b9\u30b3\u30b0 (DJUNG)",
+      "date": "2026-02-16T08:38"
+    },
+    {
+      "name": "Bob Lazar (LAZAR)",
+      "date": "2026-02-16T08:38"
+    },
+    {
+      "name": "Mochi Panda (Mochi)",
+      "date": "2026-02-16T08:38"
+    },
+    {
+      "name": "b\u01d0ngw\u01d4 (\u4e19\u5348)",
+      "date": "2026-02-16T08:38"
+    },
+    {
+      "name": "Punch\u2019s Father (KOSUKE)",
+      "date": "2026-02-16T08:38"
+    },
+    {
+      "name": "Official Lizard Coin (LIZARD)",
+      "date": "2026-02-16T08:38"
+    },
+    {
+      "name": "Wealth Mogging (WEALTHMOG)",
+      "date": "2026-02-16T08:38"
+    },
+    {
+      "name": "Mog Coin (MOG)",
+      "date": "2026-02-16T08:38"
+    },
+    {
+      "name": "MELON MUSK (MELON)",
+      "date": "2026-02-16T08:38"
+    },
+    {
+      "name": "Rizzmadan (Rizzmadan)",
+      "date": "2026-02-16T08:38"
+    },
+    {
+      "name": "SpaceX Grok (spok)",
+      "date": "2026-02-16T08:38"
+    },
+    {
+      "name": "we're curing cancer, right? (right)",
+      "date": "2026-02-16T08:38"
     }
   ],
-  "last_scan": "2026-02-16T08:32",
+  "last_scan": "2026-02-16T08:38",
   "active_picks": [
     {
       "name": "Punch\u2019s Father",
@@ -118,9 +170,9 @@
       "confidence": 9,
       "reason": "HEAVY buy pressure, high buy/sell ratio, and new pair",
       "picked_at": "2026-02-16T08:26",
-      "scans_tracked": 1,
+      "scans_tracked": 2,
       "peak_price": 8.78e-06,
-      "lowest_price": 8.132e-06,
+      "lowest_price": 7.094e-06,
       "entry_snapshot": {
         "market_cap": 8780.0,
         "mc_tier": "micro (<100k)",
@@ -148,9 +200,9 @@
       "confidence": 8,
       "reason": "High volume spike, strong buy pressure, and new pair",
       "picked_at": "2026-02-16T08:26",
-      "scans_tracked": 1,
+      "scans_tracked": 2,
       "peak_price": 0.0003426,
-      "lowest_price": 0.0003348,
+      "lowest_price": 0.0003016,
       "entry_snapshot": {
         "market_cap": 334808.0,
         "mc_tier": "small (100k-500k)",
@@ -178,8 +230,8 @@
       "confidence": 7,
       "reason": "High buy/sell ratio, new pair, and heavy buy pressure",
       "picked_at": "2026-02-16T08:26",
-      "scans_tracked": 1,
-      "peak_price": 1.073e-05,
+      "scans_tracked": 2,
+      "peak_price": 1.094e-05,
       "lowest_price": 9.841e-06,
       "entry_snapshot": {
         "market_cap": 10738.0,
@@ -208,9 +260,9 @@
       "confidence": 9,
       "reason": "Strong buy pressure, WHALE accumulation, and high buy/sell ratio",
       "picked_at": "2026-02-16T08:32",
-      "scans_tracked": 0,
+      "scans_tracked": 1,
       "peak_price": 8.132e-06,
-      "lowest_price": 8.132e-06,
+      "lowest_price": 7.094e-06,
       "entry_snapshot": {
         "market_cap": 8132.0,
         "mc_tier": "micro (<100k)",
@@ -238,9 +290,9 @@
       "confidence": 8,
       "reason": "High volume spike, strong buy pressure, and WHALE accumulation",
       "picked_at": "2026-02-16T08:32",
-      "scans_tracked": 0,
+      "scans_tracked": 1,
       "peak_price": 0.0003426,
-      "lowest_price": 0.0003426,
+      "lowest_price": 0.0003016,
       "entry_snapshot": {
         "market_cap": 342637.0,
         "mc_tier": "small (100k-500k)",
@@ -268,8 +320,8 @@
       "confidence": 7,
       "reason": "Strong buy pressure, high buy/sell ratio, and recent listing",
       "picked_at": "2026-02-16T08:32",
-      "scans_tracked": 0,
-      "peak_price": 9.841e-06,
+      "scans_tracked": 1,
+      "peak_price": 1.094e-05,
       "lowest_price": 9.841e-06,
       "entry_snapshot": {
         "market_cap": 9841.0,
@@ -287,6 +339,96 @@
         "price_change_24h": -72.09,
         "dex": "pumpswap",
         "hours_old": 11.6,
+        "source": "scan"
+      }
+    },
+    {
+      "name": "Punch\u2019s Father",
+      "symbol": "KOSUKE",
+      "contract": "62eFhsfHF5FnYnd1cmodYa8SfSwxJnJk5BrSwMh2pump",
+      "entry_price": 7.094e-06,
+      "confidence": 9,
+      "reason": "NEW, HEAVY buy pressure, and high buy/sell ratio",
+      "picked_at": "2026-02-16T08:38",
+      "scans_tracked": 0,
+      "peak_price": 7.094e-06,
+      "lowest_price": 7.094e-06,
+      "entry_snapshot": {
+        "market_cap": 7094.0,
+        "mc_tier": "micro (<100k)",
+        "liquidity": 6804.08,
+        "liq_to_mc_ratio": 0.9591,
+        "volume_1h": 1374.9,
+        "volume_24h": 555134.93,
+        "vol_spike": 0.06,
+        "vol_tier": "normal",
+        "buy_ratio_1h": 2.97,
+        "pressure_tier": "heavy_buying",
+        "price_change_1h": -33.93,
+        "price_change_6h": -43.98,
+        "price_change_24h": -79.93,
+        "dex": "pumpswap",
+        "hours_old": 8.2,
+        "source": "scan"
+      }
+    },
+    {
+      "name": "Mog Coin",
+      "symbol": "MOG",
+      "contract": "4MdtwK7ezBemvAWsW32HuvVD7o7j89Y3poYwJpWopump",
+      "entry_price": 0.0003016,
+      "confidence": 8,
+      "reason": "NEW, high volume spike, and strong buy pressure",
+      "picked_at": "2026-02-16T08:38",
+      "scans_tracked": 0,
+      "peak_price": 0.0003016,
+      "lowest_price": 0.0003016,
+      "entry_snapshot": {
+        "market_cap": 301621.0,
+        "mc_tier": "small (100k-500k)",
+        "liquidity": 46535.81,
+        "liq_to_mc_ratio": 0.1543,
+        "volume_1h": 76616.37,
+        "volume_24h": 1292401.12,
+        "vol_spike": 1.42,
+        "vol_tier": "normal",
+        "buy_ratio_1h": 1.33,
+        "pressure_tier": "balanced",
+        "price_change_1h": -18.8,
+        "price_change_6h": 230.0,
+        "price_change_24h": 740.0,
+        "dex": "pumpswap",
+        "hours_old": 6.9,
+        "source": "scan"
+      }
+    },
+    {
+      "name": "\u30b8\u30e5\u30f3\u30b2\u30eb\u30b9\u30b3\u30b0",
+      "symbol": "DJUNG",
+      "contract": "BdzPznfioqeZ9MZx3ggDsys896UuaEbcEe8hsDRRPnUX",
+      "entry_price": 1.931e-05,
+      "confidence": 7,
+      "reason": "NEW, high buy/sell ratio, and strong recent price action",
+      "picked_at": "2026-02-16T08:38",
+      "scans_tracked": 0,
+      "peak_price": 1.931e-05,
+      "lowest_price": 1.931e-05,
+      "entry_snapshot": {
+        "market_cap": 19320.0,
+        "mc_tier": "micro (<100k)",
+        "liquidity": 9485.04,
+        "liq_to_mc_ratio": 0.4909,
+        "volume_1h": 3202.25,
+        "volume_24h": 1108606.17,
+        "vol_spike": 0.07,
+        "vol_tier": "normal",
+        "buy_ratio_1h": 1.58,
+        "pressure_tier": "strong_buying",
+        "price_change_1h": -24.86,
+        "price_change_6h": -55.96,
+        "price_change_24h": 2013.0,
+        "dex": "raydium",
+        "hours_old": 21.4,
         "source": "scan"
       }
     }
