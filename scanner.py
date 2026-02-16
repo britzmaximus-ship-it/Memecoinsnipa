@@ -1,4 +1,4 @@
-import os, re, json, requests, math
+import os, re, json, requests, math, random
 from datetime import datetime
 from collections import Counter
 
@@ -163,6 +163,19 @@ YOUR REAL TRACK RECORD (from watching your past picks):
             prompt += "\n--- REPEAT SIGHTINGS ---\n"
             for name, count in sorted(repeats.items(), key=lambda x: x[1], reverse=True)[:10]:
                 prompt += f"- {name}: seen {count} times\n"
+
+    # Inject paper trade performance if available
+    pt_stats = playbook.get("paper_trade_stats", {})
+    pt_total = pt_stats.get("total_trades", 0)
+    if pt_total > 0:
+        pt_wr = pt_stats.get("win_rate", 0)
+        pt_avg = pt_stats.get("avg_return_pct", 0)
+        prompt += f"""
+--- PAPER TRADE PERFORMANCE (simulated real trades) ---
+- Paper trades completed: {pt_total}
+- Paper trade win rate: {pt_wr}%
+- Paper trade avg return: {pt_avg:+.1f}%
+USE THIS to validate whether your picks actually make money when traded.\n"""
 
     prompt += f"""
 Scan #{playbook.get('scans', 0) + 1}. You've been learning for {playbook.get('scans', 0)} scans.
@@ -547,6 +560,22 @@ def load_playbook():
                 "by_age_group": {},
                 "by_source": {}
             })
+            # === PAPER TRADE FIELDS ===
+            pb.setdefault("paper_trades", [])
+            pb.setdefault("paper_trade_history", [])
+            pb.setdefault("paper_trade_stats", {
+                "total_trades": 0,
+                "wins": 0,
+                "losses": 0,
+                "win_rate": 0,
+                "avg_return_pct": 0,
+                "avg_return_x": 0,
+                "best_trade": {},
+                "worst_trade": {},
+                "current_streak": 0,
+                "strategy_accuracy_pct": 0
+            })
+            pb.setdefault("paper_trade_id_counter", 0)
             return pb
     except:
         return {
@@ -579,7 +608,23 @@ def load_playbook():
                 "by_pressure_tier": {},
                 "by_age_group": {},
                 "by_source": {}
-            }
+            },
+            # === PAPER TRADE FIELDS ===
+            "paper_trades": [],
+            "paper_trade_history": [],
+            "paper_trade_stats": {
+                "total_trades": 0,
+                "wins": 0,
+                "losses": 0,
+                "win_rate": 0,
+                "avg_return_pct": 0,
+                "avg_return_x": 0,
+                "best_trade": {},
+                "worst_trade": {},
+                "current_streak": 0,
+                "strategy_accuracy_pct": 0
+            },
+            "paper_trade_id_counter": 0
         }
 
 
@@ -596,6 +641,9 @@ def save_playbook(pb):
     pb["mistake_log"] = pb.get("mistake_log", [])[-20:]
     pb["trade_memory"] = pb.get("trade_memory", [])[-100:]
     pb["lessons"] = pb.get("lessons", [])[-50:]
+    # === PAPER TRADE TRIMMING ===
+    pb["paper_trades"] = pb.get("paper_trades", [])[:3]  # Max 3 open
+    pb["paper_trade_history"] = pb.get("paper_trade_history", [])[-100:]
     with open("playbook.json", "w") as f:
         json.dump(pb, f, indent=2)
 
@@ -1153,6 +1201,591 @@ def check_past_picks(pb):
 
 
 # ============================================================
+# AUTO PAPER TRADE ENGINE
+# ============================================================
+
+def parse_price_value(text):
+    """Extract a numeric price value from a line of text."""
+    # Remove commas from numbers like $334,808
+    cleaned = text.replace(",", "")
+    # Match price patterns: $0.0003348, $1.073e-05, 0.0003348, 1.073e-05
+    patterns = [
+        r'\$\s*([0-9]*\.?[0-9]+(?:[eE][+-]?\d+)?)',   # With $ sign
+        r'([0-9]*\.?[0-9]+(?:[eE][+-]?\d+)?)',          # Plain number
+    ]
+    for pat in patterns:
+        m = re.search(pat, cleaned)
+        if m:
+            try:
+                val = float(m.group(1))
+                if val > 0:
+                    return val
+            except:
+                continue
+    return None
+
+
+def parse_trade_setups(research_text):
+    """Parse trade setups (SL, TP1, TP2, TP3) from Stage 2 research output.
+    Returns dict keyed by symbol: {symbol: {stop_loss, tp1, tp2, tp3}}"""
+    setups = {}
+    current_symbol = None
+
+    for line in research_text.split('\n'):
+        line_stripped = line.strip()
+
+        # Detect pick headers: "PICK #1: TOKEN_NAME (SYMBOL)" or similar
+        pick_match = re.search(
+            r'PICK\s*#?\s*\d+\s*[:\-]\s*(.+?)\s*\((\w+)\)',
+            line_stripped, re.IGNORECASE
+        )
+        if pick_match:
+            current_symbol = pick_match.group(2).upper()
+            setups.setdefault(current_symbol, {})
+            continue
+
+        if not current_symbol:
+            continue
+
+        line_lower = line_stripped.lower()
+        price = parse_price_value(line_stripped)
+
+        if price and price > 0:
+            if 'stop loss' in line_lower or 'stop-loss' in line_lower or 'sl:' in line_lower:
+                setups[current_symbol]['stop_loss'] = price
+            elif 'tp3' in line_lower or 'moon' in line_lower:
+                setups[current_symbol]['tp3'] = price
+            elif 'tp2' in line_lower or 'mid' in line_lower:
+                setups[current_symbol]['tp2'] = price
+            elif 'tp1' in line_lower or 'safe' in line_lower:
+                setups[current_symbol]['tp1'] = price
+
+    return setups
+
+
+def create_paper_trade(pb, pick, trade_setup, scan_num):
+    """Create a single paper trade entry with simulated slippage."""
+    entry_price = pick.get("entry_price", 0)
+    if entry_price <= 0:
+        return None
+
+    # Simulated slippage 0.5-1% (buying slightly higher)
+    slippage_pct = round(random.uniform(0.5, 1.0), 2)
+    entry_with_slippage = entry_price * (1 + slippage_pct / 100)
+
+    # Get SL/TP from parsed research, or use defaults
+    stop_loss = trade_setup.get('stop_loss', entry_with_slippage * 0.75)
+    tp1 = trade_setup.get('tp1', entry_with_slippage * 2.0)
+    tp2 = trade_setup.get('tp2', entry_with_slippage * 3.5)
+    tp3 = trade_setup.get('tp3', entry_with_slippage * 7.0)
+
+    # Generate trade ID
+    pb["paper_trade_id_counter"] = pb.get("paper_trade_id_counter", 0) + 1
+    trade_id = f"PT-{scan_num}-{pb['paper_trade_id_counter']}"
+
+    # Get full market snapshot at entry
+    contract = pick.get("contract", "")
+    market_data = get_token_full_data(contract) if contract else {}
+    if not market_data:
+        market_data = {}
+
+    now = datetime.now().isoformat()[:16]
+
+    trade = {
+        "trade_id": trade_id,
+        "token_name": pick.get("name", "Unknown"),
+        "symbol": pick.get("symbol", "?"),
+        "contract": contract,
+        "entry_price": round(entry_with_slippage, 10),
+        "original_rec_price": entry_price,
+        "slippage_pct": slippage_pct,
+        "stop_loss": stop_loss,
+        "original_stop_loss": stop_loss,
+        "tp1": tp1,
+        "tp2": tp2,
+        "tp3": tp3,
+        "tp1_hit": False,
+        "tp2_hit": False,
+        "status": "OPEN",
+        "confidence": pick.get("confidence", 5),
+        "reason": pick.get("reason", ""),
+        "opened_at": now,
+        "last_update": now,
+        "peak_price": entry_with_slippage,
+        "lowest_price": entry_with_slippage,
+        "scans_monitored": 0,
+        "updates": [],
+        "entry_snapshot": {
+            "market_cap": market_data.get("market_cap", 0),
+            "mc_tier": market_data.get("mc_tier", "unknown"),
+            "liquidity": market_data.get("liquidity", 0),
+            "liq_to_mc_ratio": market_data.get("liq_to_mc_ratio", 0),
+            "volume_1h": market_data.get("volume_1h", 0),
+            "volume_24h": market_data.get("volume_24h", 0),
+            "vol_spike": market_data.get("vol_spike", 0),
+            "vol_tier": market_data.get("vol_tier", "unknown"),
+            "buy_ratio_1h": market_data.get("buy_ratio_1h", 0),
+            "pressure_tier": market_data.get("pressure_tier", "unknown"),
+            "price_change_1h": market_data.get("price_change_1h", 0),
+            "price_change_6h": market_data.get("price_change_6h", 0),
+            "price_change_24h": market_data.get("price_change_24h", 0),
+            "dex": market_data.get("dex", "unknown"),
+            "hours_old": market_data.get("hours_old")
+        }
+    }
+
+    return trade
+
+
+def evaluate_trade_action(trade, current_price, current_data):
+    """Evaluate what action to take on an open paper trade.
+    Returns (action, reason) tuple."""
+    entry = trade["entry_price"]
+    sl = trade["stop_loss"]
+    tp1 = trade["tp1"]
+    tp2 = trade["tp2"]
+    tp3 = trade["tp3"]
+
+    return_pct = ((current_price - entry) / entry) * 100
+
+    # ---- STOP LOSS CHECK ----
+    if current_price <= sl:
+        return "EXIT", f"Stop loss hit at ${current_price:.10g} (SL: ${sl:.10g})"
+
+    # ---- TAKE PROFIT CHECKS ----
+    if current_price >= tp3:
+        return "EXIT_TP3", f"TP3 (Moon) reached! ${current_price:.10g} (+{return_pct:.1f}%)"
+
+    if current_price >= tp2 and not trade.get("tp2_hit"):
+        return "PARTIAL_TP2", f"TP2 (Mid) reached! ${current_price:.10g} (+{return_pct:.1f}%)"
+
+    if current_price >= tp1 and not trade.get("tp1_hit"):
+        return "PARTIAL_TP1", f"TP1 (Safe) reached! ${current_price:.10g} (+{return_pct:.1f}%)"
+
+    # ---- MOMENTUM / WHALE CHECKS (need current market data) ----
+    if current_data:
+        buy_ratio = current_data.get("buy_ratio_1h", 1.0)
+        vol_spike = current_data.get("vol_spike", 0)
+        price_change_1h = current_data.get("price_change_1h", 0)
+        liquidity = current_data.get("liquidity", 0)
+        entry_liq = trade.get("entry_snapshot", {}).get("liquidity", 0)
+
+        # Momentum collapse: heavy selling + sharp price drop
+        if buy_ratio < 0.5 and price_change_1h < -30:
+            return "EXIT", f"Momentum collapse: buy ratio {buy_ratio}, 1h change {price_change_1h}%"
+
+        # Whale exit: high volume dump
+        if buy_ratio < 0.6 and vol_spike > 3.0 and price_change_1h < -20:
+            return "EXIT", f"Whale exit signal: ratio {buy_ratio}, vol spike {vol_spike}x, 1h {price_change_1h}%"
+
+        # Liquidity rug: liquidity dropped significantly
+        if entry_liq > 0 and liquidity < entry_liq * 0.3:
+            return "EXIT", f"Liquidity drain: ${liquidity:,.0f} (was ${entry_liq:,.0f} at entry)"
+
+        # Move stop loss to breakeven if +50%
+        if return_pct >= 50 and sl < entry:
+            return "MOVE_SL", f"In profit +{return_pct:.1f}%, moving SL to breakeven"
+
+        # Strong buy signal
+        if buy_ratio >= 2.5 and vol_spike >= 2.0 and return_pct > 0:
+            return "ADD", f"Strong momentum: buy ratio {buy_ratio}, vol spike {vol_spike}x"
+
+    return "HOLD", f"Monitoring ({return_pct:+.1f}%)"
+
+
+def close_paper_trade(pb, trade, exit_price, reason, exit_data=None):
+    """Close a paper trade and record results."""
+    entry = trade["entry_price"]
+    return_pct = round(((exit_price - entry) / entry) * 100, 1)
+    return_x = round(exit_price / entry, 2)
+    peak_return = round(((trade.get("peak_price", entry) - entry) / entry) * 100, 1)
+
+    is_win = return_pct > 0
+    result_tag = "WIN" if is_win else "LOSS"
+
+    now = datetime.now().isoformat()[:16]
+    opened_at = trade.get("opened_at", now)
+
+    # Calculate duration
+    try:
+        open_dt = datetime.fromisoformat(opened_at)
+        close_dt = datetime.now()
+        duration_mins = int((close_dt - open_dt).total_seconds() / 60)
+        if duration_mins < 60:
+            duration_str = f"{duration_mins}m"
+        else:
+            hours = duration_mins // 60
+            mins = duration_mins % 60
+            duration_str = f"{hours}h {mins}m"
+    except:
+        duration_str = "unknown"
+
+    snapshot = trade.get("entry_snapshot", {})
+
+    # Build closed trade record
+    closed_record = {
+        "trade_id": trade["trade_id"],
+        "token_name": trade["token_name"],
+        "symbol": trade["symbol"],
+        "contract": trade["contract"],
+        "entry_price": entry,
+        "exit_price": exit_price,
+        "return_pct": return_pct,
+        "return_x": return_x,
+        "peak_return_pct": peak_return,
+        "result": result_tag,
+        "reason_closed": reason,
+        "confidence_at_entry": trade.get("confidence", 0),
+        "reason_entered": trade.get("reason", ""),
+        "opened_at": opened_at,
+        "closed_at": now,
+        "duration": duration_str,
+        "scans_monitored": trade.get("scans_monitored", 0),
+        "tp1_hit": trade.get("tp1_hit", False),
+        "tp2_hit": trade.get("tp2_hit", False),
+        "slippage_pct": trade.get("slippage_pct", 0),
+        # Entry conditions for analysis
+        "entry_vol_spike": snapshot.get("vol_spike", 0),
+        "entry_buy_pressure": snapshot.get("buy_ratio_1h", 0),
+        "entry_pressure_tier": snapshot.get("pressure_tier", "unknown"),
+        "entry_whale_activity": snapshot.get("pressure_tier", "unknown"),
+        "entry_market_cap": snapshot.get("market_cap", 0),
+        "entry_mc_tier": snapshot.get("mc_tier", "unknown"),
+        "entry_liquidity": snapshot.get("liquidity", 0),
+        "entry_age_hours": snapshot.get("hours_old"),
+        "failure_reason": reason if not is_win else ""
+    }
+
+    # Add to history
+    history = pb.get("paper_trade_history", [])
+    history.append(closed_record)
+    pb["paper_trade_history"] = history[-100:]
+
+    # Update stats
+    update_paper_trade_stats(pb)
+
+    return closed_record
+
+
+def update_paper_trade_stats(pb):
+    """Recalculate paper trade performance statistics."""
+    history = pb.get("paper_trade_history", [])
+    if not history:
+        return
+
+    total = len(history)
+    wins = [t for t in history if t["return_pct"] > 0]
+    losses = [t for t in history if t["return_pct"] <= 0]
+    all_returns = [t["return_pct"] for t in history]
+    all_x = [t.get("return_x", 1.0) for t in history]
+
+    win_count = len(wins)
+    loss_count = len(losses)
+    win_rate = round((win_count / max(total, 1)) * 100, 1)
+    avg_return = round(sum(all_returns) / max(total, 1), 1)
+    avg_x = round(sum(all_x) / max(total, 1), 2)
+
+    # Best and worst trades
+    best = max(history, key=lambda t: t["return_pct"])
+    worst = min(history, key=lambda t: t["return_pct"])
+
+    # Current streak
+    streak = 0
+    if history:
+        last_result = history[-1]["return_pct"] > 0
+        for t in reversed(history):
+            if (t["return_pct"] > 0) == last_result:
+                streak += 1 if last_result else -1
+            else:
+                break
+
+    # Strategy accuracy: how often high confidence (>=8) picks win
+    high_conf = [t for t in history if t.get("confidence_at_entry", 0) >= 8]
+    if high_conf:
+        hc_wins = len([t for t in high_conf if t["return_pct"] > 0])
+        strategy_accuracy = round((hc_wins / len(high_conf)) * 100, 1)
+    else:
+        strategy_accuracy = 0
+
+    pb["paper_trade_stats"] = {
+        "total_trades": total,
+        "wins": win_count,
+        "losses": loss_count,
+        "win_rate": win_rate,
+        "avg_return_pct": avg_return,
+        "avg_return_x": avg_x,
+        "best_trade": {
+            "token": best["token_name"],
+            "return_pct": best["return_pct"],
+            "return_x": best.get("return_x", 0)
+        },
+        "worst_trade": {
+            "token": worst["token_name"],
+            "return_pct": worst["return_pct"],
+            "return_x": worst.get("return_x", 0)
+        },
+        "current_streak": streak,
+        "strategy_accuracy_pct": strategy_accuracy
+    }
+
+
+def monitor_paper_trades(pb):
+    """Monitor all open paper trades. Returns Telegram report text or None."""
+    trades = pb.get("paper_trades", [])
+    if not trades:
+        return None
+
+    still_open = []
+    report_lines = []
+    closed_lines = []
+
+    for trade in trades:
+        contract = trade.get("contract", "")
+        if not contract:
+            still_open.append(trade)
+            continue
+
+        # Get current price and full data
+        current_price = get_token_price(contract)
+        current_data = get_token_full_data(contract)
+
+        trade["scans_monitored"] = trade.get("scans_monitored", 0) + 1
+        trade["last_update"] = datetime.now().isoformat()[:16]
+
+        # Handle unreachable token
+        if current_price is None:
+            if trade["scans_monitored"] >= 8:
+                # Token is dead â close the trade
+                closed = close_paper_trade(pb, trade, 0, "Token unreachable/rugged")
+                closed_lines.append(
+                    f"\U0001f480 {trade['trade_id']} {trade['token_name']} - "
+                    f"RUGGED/DEAD (-100%) | Duration: {closed['duration']}"
+                )
+            else:
+                still_open.append(trade)
+                report_lines.append(
+                    f"\u26a0\ufe0f {trade['trade_id']} {trade['symbol']}: "
+                    f"Price unavailable (scan {trade['scans_monitored']}/8)"
+                )
+            continue
+
+        # Update peak/lowest
+        if current_price > trade.get("peak_price", 0):
+            trade["peak_price"] = current_price
+        if current_price < trade.get("lowest_price", float('inf')):
+            trade["lowest_price"] = current_price
+
+        # Evaluate what to do
+        action, reason = evaluate_trade_action(trade, current_price, current_data)
+        return_pct = round(((current_price - trade["entry_price"]) / trade["entry_price"]) * 100, 1)
+
+        # Record update
+        trade.setdefault("updates", []).append({
+            "scan": trade["scans_monitored"],
+            "price": current_price,
+            "action": action,
+            "reason": reason,
+            "time": datetime.now().isoformat()[:16]
+        })
+        # Keep last 20 updates per trade
+        trade["updates"] = trade["updates"][-20:]
+
+        if action == "EXIT" or action == "EXIT_TP3":
+            # Close the trade
+            closed = close_paper_trade(pb, trade, current_price, reason)
+            emoji = "\u2705" if closed["return_pct"] > 0 else "\u274c"
+            closed_lines.append(
+                f"{emoji} {trade['trade_id']} {trade['token_name']} ({trade['symbol']})\n"
+                f"   Entry: ${trade['entry_price']:.10g} \u2192 Exit: ${current_price:.10g}\n"
+                f"   Return: {closed['return_pct']:+.1f}% ({closed['return_x']}x) | "
+                f"Duration: {closed['duration']}\n"
+                f"   Reason: {reason}"
+            )
+
+        elif action == "PARTIAL_TP1":
+            trade["tp1_hit"] = True
+            # Move SL to breakeven
+            trade["stop_loss"] = trade["entry_price"]
+            still_open.append(trade)
+            report_lines.append(
+                f"\U0001f4b0 {trade['trade_id']} {trade['symbol']}: TP1 HIT! "
+                f"{return_pct:+.1f}% | SL moved to breakeven\n"
+                f"   {reason}"
+            )
+
+        elif action == "PARTIAL_TP2":
+            trade["tp2_hit"] = True
+            # Move SL to TP1
+            trade["stop_loss"] = trade["tp1"]
+            still_open.append(trade)
+            report_lines.append(
+                f"\U0001f4b0\U0001f4b0 {trade['trade_id']} {trade['symbol']}: TP2 HIT! "
+                f"{return_pct:+.1f}% | SL moved to TP1\n"
+                f"   {reason}"
+            )
+
+        elif action == "MOVE_SL":
+            # Move SL to breakeven if not already
+            if trade["stop_loss"] < trade["entry_price"]:
+                trade["stop_loss"] = trade["entry_price"]
+            still_open.append(trade)
+            report_lines.append(
+                f"\U0001f6e1\ufe0f {trade['trade_id']} {trade['symbol']}: "
+                f"{return_pct:+.1f}% | SL tightened to ${trade['stop_loss']:.10g}\n"
+                f"   {reason}"
+            )
+
+        elif action == "ADD":
+            still_open.append(trade)
+            report_lines.append(
+                f"\U0001f7e2 {trade['trade_id']} {trade['symbol']}: "
+                f"{return_pct:+.1f}% | STRONG SIGNAL\n"
+                f"   {reason}"
+            )
+
+        else:  # HOLD
+            still_open.append(trade)
+            emoji = "\U0001f4c8" if return_pct > 0 else "\U0001f4c9" if return_pct < 0 else "\u2796"
+            peak_ret = round(((trade["peak_price"] - trade["entry_price"]) / trade["entry_price"]) * 100, 1)
+
+            # Build status indicators
+            status_parts = []
+            if trade.get("tp1_hit"):
+                status_parts.append("TP1\u2705")
+            if trade.get("tp2_hit"):
+                status_parts.append("TP2\u2705")
+            status_tag = " | ".join(status_parts) if status_parts else ""
+
+            # Show current market conditions if available
+            market_info = ""
+            if current_data:
+                br = current_data.get("buy_ratio_1h", 0)
+                vs = current_data.get("vol_spike", 0)
+                market_info = f" | Buy: {br}x | Vol: {vs}x"
+
+            report_lines.append(
+                f"{emoji} {trade['trade_id']} {trade['symbol']}: "
+                f"{return_pct:+.1f}% (peak: +{peak_ret}%) | "
+                f"HOLD{' | ' + status_tag if status_tag else ''}"
+                f"{market_info}"
+            )
+
+    pb["paper_trades"] = still_open
+
+    # Build full report
+    if not report_lines and not closed_lines:
+        return None
+
+    pt_stats = pb.get("paper_trade_stats", {})
+    total_closed = pt_stats.get("total_trades", 0)
+    win_rate = pt_stats.get("win_rate", 0)
+    avg_ret = pt_stats.get("avg_return_pct", 0)
+    streak = pt_stats.get("current_streak", 0)
+    streak_str = f"+{streak}W" if streak > 0 else f"{streak}L" if streak < 0 else "0"
+
+    header = (
+        f"\U0001f4b5 PAPER TRADE MONITOR\n"
+        f"{'='*35}\n"
+        f"Open: {len(still_open)}/3 | Closed: {total_closed} | "
+        f"Win rate: {win_rate}%\n"
+        f"Avg return: {avg_ret:+.1f}% | Streak: {streak_str}\n"
+        f"{'='*35}\n"
+    )
+
+    sections = []
+    if closed_lines:
+        sections.append("\n\U0001f4cb CLOSED TRADES:\n" + "\n".join(closed_lines))
+    if report_lines:
+        sections.append("\n\U0001f50d OPEN POSITIONS:\n" + "\n".join(report_lines))
+
+    return header + "\n".join(sections)
+
+
+def auto_open_paper_trades(pb, stage1_result, research_text, scan_num):
+    """Automatically open paper trades for high-confidence picks.
+    Only opens trades for confidence >= 7, max 3 open at a time."""
+    open_trades = pb.get("paper_trades", [])
+
+    # Check max open trades limit
+    if len(open_trades) >= 3:
+        return []
+
+    # Get picks from Stage 1
+    picks = extract_picks_json(stage1_result)
+    if not picks:
+        return []
+
+    # Parse trade setups from Stage 2 research
+    setups = parse_trade_setups(research_text) if research_text else {}
+
+    # Filter for high confidence only, sort by confidence desc
+    eligible = [p for p in picks if p.get("confidence", 0) >= 7]
+    eligible.sort(key=lambda x: x.get("confidence", 0), reverse=True)
+
+    if not eligible:
+        return []
+
+    # Don't duplicate: check if token already has an open paper trade
+    open_contracts = {t["contract"] for t in open_trades}
+
+    new_trades = []
+    slots = 3 - len(open_trades)
+
+    for pick in eligible:
+        if slots <= 0:
+            break
+
+        contract = pick.get("contract", "")
+        if not contract or contract in open_contracts:
+            continue
+
+        symbol = pick.get("symbol", "?").upper()
+        trade_setup = setups.get(symbol, {})
+
+        trade = create_paper_trade(pb, pick, trade_setup, scan_num)
+        if trade:
+            open_trades.append(trade)
+            open_contracts.add(contract)
+            new_trades.append(trade)
+            slots -= 1
+
+    pb["paper_trades"] = open_trades
+    return new_trades
+
+
+def format_new_trade_alert(trade):
+    """Format a Telegram alert for a newly opened paper trade."""
+    entry = trade["entry_price"]
+    rec = trade["original_rec_price"]
+    sl = trade["stop_loss"]
+    tp1 = trade["tp1"]
+    tp2 = trade["tp2"]
+    tp3 = trade["tp3"]
+    slip = trade["slippage_pct"]
+    conf = trade.get("confidence", 0)
+    snapshot = trade.get("entry_snapshot", {})
+
+    return (
+        f"\U0001f514 NEW PAPER TRADE OPENED\n"
+        f"{'='*35}\n"
+        f"ID: {trade['trade_id']}\n"
+        f"Token: {trade['token_name']} ({trade['symbol']})\n"
+        f"Contract: {trade['contract'][:20]}...{trade['contract'][-8:]}\n\n"
+        f"Entry: ${entry:.10g} (rec: ${rec:.10g}, slip: {slip}%)\n"
+        f"Stop Loss: ${sl:.10g}\n"
+        f"TP1 (Safe): ${tp1:.10g} ({round((tp1/entry - 1)*100)}%)\n"
+        f"TP2 (Mid): ${tp2:.10g} ({round((tp2/entry - 1)*100)}%)\n"
+        f"TP3 (Moon): ${tp3:.10g} ({round((tp3/entry - 1)*100)}%)\n\n"
+        f"Confidence: {conf}/10\n"
+        f"Reason: {trade.get('reason', '?')}\n"
+        f"MC: ${snapshot.get('market_cap', 0):,.0f} | "
+        f"Vol spike: {snapshot.get('vol_spike', 0)}x | "
+        f"Buy ratio: {snapshot.get('buy_ratio_1h', 0)}\n"
+        f"{'='*35}"
+    )
+
+
+# ============================================================
 # AI CALLS
 # ============================================================
 
@@ -1207,6 +1840,12 @@ def main():
     rules_count = len(playbook.get("strategy_rules", []))
     memory_count = len(playbook.get("trade_memory", []))
 
+    # Paper trade stats for header
+    pt_stats = playbook.get("paper_trade_stats", {})
+    pt_total = pt_stats.get("total_trades", 0)
+    pt_open = len(playbook.get("paper_trades", []))
+    pt_wr = pt_stats.get("win_rate", 0)
+
     send_msg(
         f"\U0001f50d Scan #{scan_num} starting...\n"
         f"\U0001f4e1 Sources: DEXScreener Boosted + Profiles + New/PumpFun\n"
@@ -1214,6 +1853,8 @@ def main():
         f"Track record: {total_picks} picks, {win_rate}% win rate\n"
         f"\U0001f4ca Trade memory: {memory_count} detailed records | "
         f"Strategy rules: {rules_count}\n"
+        f"\U0001f4b5 Paper trades: {pt_open}/3 open | "
+        f"{pt_total} closed | {pt_wr}% win rate\n"
         f"\u23f3 Self-learning scan with dynamic strategy..."
     )
 
@@ -1222,7 +1863,12 @@ def main():
     if tracker_report:
         send_msg(tracker_report)
 
-    # ---- STEP 1.5: Update ROI tiers and strategy rules ----
+    # ---- STEP 1.5: Monitor open paper trades ----
+    pt_report = monitor_paper_trades(playbook)
+    if pt_report:
+        send_msg(pt_report)
+
+    # ---- STEP 1.6: Update ROI tiers and strategy rules ----
     update_roi_tiers(playbook)
 
     # Generate dynamic strategy rules every 5 scans (once enough data)
@@ -1335,6 +1981,24 @@ def main():
         send_msg(header + research)
     else:
         send_msg("\u26a0\ufe0f Deep research failed. Stage 1 picks above still valid.")
+
+    # ---- STEP 5: Auto paper trade (confidence >= 7 picks) ----
+    new_trades = auto_open_paper_trades(
+        playbook, stage1_result, research or "", scan_num
+    )
+    if new_trades:
+        for trade in new_trades:
+            send_msg(format_new_trade_alert(trade))
+        send_msg(
+            f"\U0001f4b5 Paper trades: {len(playbook.get('paper_trades', []))}/3 open | "
+            f"New this scan: {len(new_trades)}"
+        )
+    else:
+        open_count = len(playbook.get("paper_trades", []))
+        if open_count >= 3:
+            send_msg("\U0001f4b5 Paper trade slots full (3/3). Monitoring existing positions.")
+        else:
+            send_msg("\U0001f4b5 No picks met confidence threshold (\u22657) for paper trading.")
 
     save_playbook(playbook)
 
