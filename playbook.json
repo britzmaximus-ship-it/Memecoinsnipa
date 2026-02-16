@@ -41,58 +41,10 @@
       "note": "**\n\n* ADDED: Prioritize tokens with strong buy pressure and whale accumulation.\n* MODIFIED: Be more cautious with tokens that have similar patterns to past losing picks.\n* REMOVED: None\n\n**"
     }
   ],
-  "scans": 31,
+  "scans": 32,
   "tokens_seen": [
     {
       "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
-      "date": "2026-02-16T19:22"
-    },
-    {
-      "name": "\u30de\u30de\u30f3 (Maman)",
-      "date": "2026-02-16T19:22"
-    },
-    {
-      "name": "ORGAZM (ORGAZM)",
-      "date": "2026-02-16T19:22"
-    },
-    {
-      "name": "Mog Coin (MOG)",
-      "date": "2026-02-16T19:22"
-    },
-    {
-      "name": "SpaceX Grok (spok)",
-      "date": "2026-02-16T19:22"
-    },
-    {
-      "name": "MELON MUSK (MELON)",
-      "date": "2026-02-16T19:22"
-    },
-    {
-      "name": "Wealth Mogging (WEALTHMOG)",
-      "date": "2026-02-16T19:22"
-    },
-    {
-      "name": "MANIFEST (MANIFEST)",
-      "date": "2026-02-16T19:22"
-    },
-    {
-      "name": "b\u01d0ngw\u01d4 (\u4e19\u5348)",
-      "date": "2026-02-16T19:25"
-    },
-    {
-      "name": "Punch\u2019s Father (KOSUKE)",
-      "date": "2026-02-16T19:25"
-    },
-    {
-      "name": "Mochi Panda (Mochi)",
-      "date": "2026-02-16T19:25"
-    },
-    {
-      "name": "Clavicular (Clav)",
-      "date": "2026-02-16T19:25"
-    },
-    {
-      "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
       "date": "2026-02-16T19:25"
     },
     {
@@ -842,9 +794,57 @@
     {
       "name": "Trenches Game (TRENCH)",
       "date": "2026-02-16T22:59"
+    },
+    {
+      "name": "Punch\u2019s Father (KOSUKE)",
+      "date": "2026-02-16T23:02"
+    },
+    {
+      "name": "Clavicular (Clav)",
+      "date": "2026-02-16T23:02"
+    },
+    {
+      "name": "firewu (FIREWU)",
+      "date": "2026-02-16T23:02"
+    },
+    {
+      "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
+      "date": "2026-02-16T23:02"
+    },
+    {
+      "name": "\u30de\u30de\u30f3 (Maman)",
+      "date": "2026-02-16T23:02"
+    },
+    {
+      "name": "ORGAZM (ORGAZM)",
+      "date": "2026-02-16T23:02"
+    },
+    {
+      "name": "b\u01d0ngw\u01d4 (\u4e19\u5348)",
+      "date": "2026-02-16T23:02"
+    },
+    {
+      "name": "Mog Coin (MOG)",
+      "date": "2026-02-16T23:02"
+    },
+    {
+      "name": "Preguntale (Preguntale)",
+      "date": "2026-02-16T23:02"
+    },
+    {
+      "name": "Wealth Mogging (WEALTHMOG)",
+      "date": "2026-02-16T23:02"
+    },
+    {
+      "name": "SAVE (SAVE)",
+      "date": "2026-02-16T23:02"
+    },
+    {
+      "name": "Trenches Game (TRENCH)",
+      "date": "2026-02-16T23:02"
     }
   ],
-  "last_scan": "2026-02-16T22:59",
+  "last_scan": "2026-02-16T23:03",
   "active_picks": [
     {
       "name": "Mochi Panda",
@@ -854,7 +854,7 @@
       "confidence": 8,
       "reason": "Moderate buy pressure, low volume spike, and high buy ratio",
       "picked_at": "2026-02-16T21:36",
-      "scans_tracked": 5,
+      "scans_tracked": 6,
       "peak_price": 6.113e-06,
       "lowest_price": 4.971e-06,
       "entry_snapshot": {
@@ -884,9 +884,9 @@
       "confidence": 7,
       "reason": "New token, low volume spike, and high buy ratio",
       "picked_at": "2026-02-16T21:36",
-      "scans_tracked": 5,
+      "scans_tracked": 6,
       "peak_price": 9.429e-06,
-      "lowest_price": 8.415e-06,
+      "lowest_price": 8.302e-06,
       "entry_snapshot": {
         "market_cap": 9428.0,
         "mc_tier": "micro (<100k)",
@@ -914,7 +914,7 @@
       "confidence": 6,
       "reason": "New token, low volume spike, and moderate buy pressure",
       "picked_at": "2026-02-16T21:36",
-      "scans_tracked": 5,
+      "scans_tracked": 6,
       "peak_price": 7.513e-06,
       "lowest_price": 5.941e-06,
       "entry_snapshot": {
@@ -944,9 +944,9 @@
       "confidence": 8,
       "reason": "Low market cap, moderate buy pressure, and no extreme volume spikes",
       "picked_at": "2026-02-16T22:48",
-      "scans_tracked": 3,
+      "scans_tracked": 4,
       "peak_price": 8.415e-06,
-      "lowest_price": 8.415e-06,
+      "lowest_price": 8.302e-06,
       "entry_snapshot": {
         "market_cap": 8413.0,
         "mc_tier": "micro (<100k)",
@@ -974,7 +974,7 @@
       "confidence": 7,
       "reason": "Micro-cap token with balanced buy pressure and no red flags",
       "picked_at": "2026-02-16T22:48",
-      "scans_tracked": 3,
+      "scans_tracked": 4,
       "peak_price": 7.781e-06,
       "lowest_price": 6.099e-06,
       "entry_snapshot": {
@@ -1004,7 +1004,7 @@
       "confidence": 6,
       "reason": "Low market cap, HEAVY buy pressure, but liq/MC ratio is a concern",
       "picked_at": "2026-02-16T22:48",
-      "scans_tracked": 3,
+      "scans_tracked": 4,
       "peak_price": 7.505e-06,
       "lowest_price": 7.505e-06,
       "entry_snapshot": {
@@ -2743,10 +2743,10 @@
       "confidence": 8,
       "reason": "Strong buy pressure, Vol spike 3.96x",
       "opened_at": "2026-02-16T18:46",
-      "last_update": "2026-02-16T22:59",
+      "last_update": "2026-02-16T23:02",
       "peak_price": 8.095206999999999e-06,
       "lowest_price": 6.983e-06,
-      "scans_monitored": 19,
+      "scans_monitored": 20,
       "updates": [
         {
           "scan": 1,
@@ -2880,6 +2880,13 @@
           "action": "HOLD",
           "reason": "Monitoring (-7.3%)",
           "time": "2026-02-16T22:59"
+        },
+        {
+          "scan": 20,
+          "price": 7.505e-06,
+          "action": "HOLD",
+          "reason": "Monitoring (-7.3%)",
+          "time": "2026-02-16T23:02"
         }
       ],
       "entry_snapshot": {
@@ -2924,10 +2931,10 @@
       "confidence": 8,
       "reason": "Moderate buy pressure, low volume spike, and high buy ratio",
       "opened_at": "2026-02-16T21:58",
-      "last_update": "2026-02-16T22:59",
+      "last_update": "2026-02-16T23:02",
       "peak_price": 5.6127173e-06,
       "lowest_price": 4.971e-06,
-      "scans_monitored": 4,
+      "scans_monitored": 5,
       "updates": [
         {
           "scan": 1,
@@ -2956,6 +2963,13 @@
           "action": "HOLD",
           "reason": "Monitoring (-11.4%)",
           "time": "2026-02-16T22:59"
+        },
+        {
+          "scan": 5,
+          "price": 4.978e-06,
+          "action": "HOLD",
+          "reason": "Monitoring (-11.3%)",
+          "time": "2026-02-16T23:02"
         }
       ],
       "entry_snapshot": {
@@ -3000,10 +3014,10 @@
       "confidence": 8,
       "reason": "Low market cap, moderate buy pressure, and no extreme volume spikes",
       "opened_at": "2026-02-16T22:49",
-      "last_update": "2026-02-16T22:59",
+      "last_update": "2026-02-16T23:02",
       "peak_price": 8.475588000000001e-06,
-      "lowest_price": 8.415e-06,
-      "scans_monitored": 2,
+      "lowest_price": 8.302e-06,
+      "scans_monitored": 3,
       "updates": [
         {
           "scan": 1,
@@ -3018,6 +3032,13 @@
           "action": "HOLD",
           "reason": "Monitoring (-0.7%)",
           "time": "2026-02-16T22:59"
+        },
+        {
+          "scan": 3,
+          "price": 8.302e-06,
+          "action": "HOLD",
+          "reason": "Monitoring (-2.0%)",
+          "time": "2026-02-16T23:02"
         }
       ],
       "entry_snapshot": {
