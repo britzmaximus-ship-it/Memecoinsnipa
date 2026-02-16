@@ -646,6 +646,8 @@ def load_playbook():
             pb.setdefault("paper_trade_id_counter", 0)
             # === PENDING TRADES (confirmation delay) ===
             pb.setdefault("pending_paper_trades", [])
+            # === CONVERSATION STATE ===
+            pb.setdefault("last_update_id", 0)
             return pb
     except:
         return {
@@ -696,7 +698,9 @@ def load_playbook():
             },
             "paper_trade_id_counter": 0,
             # === PENDING TRADES (confirmation delay) ===
-            "pending_paper_trades": []
+            "pending_paper_trades": [],
+            # === CONVERSATION STATE ===
+            "last_update_id": 0
         }
 
 
@@ -1995,24 +1999,18 @@ def format_pending_alert(queued_entries, blocked_entries):
     lines = []
 
     if queued_entries:
-        lines.append(f"\u23f3 PAPER TRADES QUEUED ({len(queued_entries)}) â confirming next scan:")
+        lines.append(f"\u23f3 QUEUED ({len(queued_entries)}):")
         for pt in queued_entries:
             lines.append(
-                f"   \U0001f7e1 {pt['name']} ({pt['symbol']}) | "
-                f"Conf: {pt['confidence']}/10 | "
-                f"Safety: {pt.get('safety_verdict', '?')} | "
-                f"Price: ${pt['rec_price']:.10g}"
+                f"  \U0001f7e1 {pt['name']} ({pt['symbol']}) "
+                f"conf {pt['confidence']}/10 | ${pt['rec_price']:.10g} | "
+                f"{pt.get('safety_verdict', '?')}"
             )
 
     if blocked_entries:
-        lines.append(f"\n\U0001f6ab BLOCKED BY SAFETY CHECK ({len(blocked_entries)}):")
+        lines.append(f"\U0001f6ab BLOCKED ({len(blocked_entries)}):")
         for bt in blocked_entries:
-            risks_str = ", ".join(bt.get("risks", [])[:3]) or "multiple red flags"
-            lines.append(
-                f"   \u274c {bt['name']} ({bt['symbol']}) | "
-                f"Verdict: {bt['verdict']} | "
-                f"Risks: {risks_str}"
-            )
+            lines.append(f"  \u274c {bt['name']} â {bt['verdict']}")
 
     return "\n".join(lines) if lines else ""
 
@@ -2022,21 +2020,19 @@ def format_confirmation_alert(confirmed, rejected):
     lines = []
 
     if confirmed:
-        lines.append(f"\u2705 PAPER TRADES CONFIRMED ({len(confirmed)}):")
+        lines.append(f"\u2705 CONFIRMED ({len(confirmed)}):")
         for trade in confirmed:
             pc = trade.get("price_change_during_confirmation", 0)
-            pc_str = f"{pc:+.1f}%" if pc else "same"
+            pc_str = f"{pc:+.1f}%" if pc else "~"
             lines.append(
-                f"   \U0001f7e2 {trade['token_name']} ({trade['symbol']}) | "
-                f"Entry: ${trade['entry_price']:.10g} | "
-                f"Price since rec: {pc_str} | "
-                f"Safety: {trade.get('safety_verdict', '?')}"
+                f"  \U0001f7e2 {trade['token_name']} ({trade['symbol']}) "
+                f"${trade['entry_price']:.10g} ({pc_str})"
             )
 
     if rejected:
-        lines.append(f"\n\u274c PENDING TRADES REJECTED ({len(rejected)}):")
+        lines.append(f"\u274c REJECTED ({len(rejected)}):")
         for rej in rejected:
-            lines.append(f"   \U0001f534 {rej['name']}: {rej['reason']}")
+            lines.append(f"  \U0001f534 {rej['name']}: {rej['reason']}")
 
     return "\n".join(lines) if lines else ""
 
@@ -2044,33 +2040,142 @@ def format_confirmation_alert(confirmed, rejected):
 def format_new_trade_alert(trade):
     """Format a Telegram alert for a newly opened paper trade."""
     entry = trade["entry_price"]
-    rec = trade["original_rec_price"]
     sl = trade["stop_loss"]
     tp1 = trade["tp1"]
     tp2 = trade["tp2"]
     tp3 = trade["tp3"]
-    slip = trade["slippage_pct"]
     conf = trade.get("confidence", 0)
-    snapshot = trade.get("entry_snapshot", {})
 
     return (
-        f"\U0001f514 NEW PAPER TRADE OPENED\n"
-        f"{'='*35}\n"
-        f"ID: {trade['trade_id']}\n"
-        f"Token: {trade['token_name']} ({trade['symbol']})\n"
-        f"Contract: {trade['contract'][:20]}...{trade['contract'][-8:]}\n\n"
-        f"Entry: ${entry:.10g} (rec: ${rec:.10g}, slip: {slip}%)\n"
-        f"Stop Loss: ${sl:.10g}\n"
-        f"TP1 (Safe): ${tp1:.10g} ({round((tp1/entry - 1)*100)}%)\n"
-        f"TP2 (Mid): ${tp2:.10g} ({round((tp2/entry - 1)*100)}%)\n"
-        f"TP3 (Moon): ${tp3:.10g} ({round((tp3/entry - 1)*100)}%)\n\n"
-        f"Confidence: {conf}/10\n"
-        f"Reason: {trade.get('reason', '?')}\n"
-        f"MC: ${snapshot.get('market_cap', 0):,.0f} | "
-        f"Vol spike: {snapshot.get('vol_spike', 0)}x | "
-        f"Buy ratio: {snapshot.get('buy_ratio_1h', 0)}\n"
-        f"{'='*35}"
+        f"\U0001f514 PAPER TRADE #{trade['trade_id']}\n"
+        f"{trade['token_name']} ({trade['symbol']})\n"
+        f"Entry ${entry:.10g} | SL ${sl:.10g}\n"
+        f"TP1 ${tp1:.10g} ({round((tp1/entry - 1)*100)}%) | "
+        f"TP2 ${tp2:.10g} ({round((tp2/entry - 1)*100)}%) | "
+        f"TP3 ${tp3:.10g} ({round((tp3/entry - 1)*100)}%)\n"
+        f"Conf {conf}/10 â {trade.get('reason', '?')}"
     )
+
+
+# ============================================================
+# TELEGRAM CONVERSATION HANDLER
+# ============================================================
+
+def get_telegram_updates(offset=None):
+    """Fetch new messages sent TO the bot since last check."""
+    try:
+        params = {"timeout": 5, "allowed_updates": ["message"]}
+        if offset:
+            params["offset"] = offset
+        r = requests.get(f"{TAPI}/getUpdates", params=params, timeout=10)
+        if r.status_code == 200:
+            return r.json().get("result", [])
+    except:
+        pass
+    return []
+
+
+def build_chat_context(pb):
+    """Build concise scanner state for AI conversation."""
+    trades = pb.get("paper_trades", [])
+    pending = pb.get("pending_paper_trades", [])
+    stats = pb.get("paper_trade_stats", {})
+    history = pb.get("paper_trade_history", [])[-5:]
+    perf = pb.get("performance", {})
+    rules = pb.get("strategy_rules", [])
+    picks = pb.get("active_picks", [])[-5:]
+
+    lines = [
+        f"Scans: {pb.get('scans', 0)} | Picks: {perf.get('total_picks', 0)} | "
+        f"Win rate: {round((perf.get('wins',0)/max(perf.get('total_picks',1),1))*100,1)}%",
+        f"\nOPEN TRADES ({len(trades)}/3):"
+    ]
+    for t in trades:
+        cur = t.get("current_price", t["entry_price"])
+        pnl = ((cur - t["entry_price"]) / t["entry_price"]) * 100
+        lines.append(
+            f"  #{t['trade_id']} {t['token_name']} ({t['symbol']}) | "
+            f"Entry ${t['entry_price']:.10g} â ${cur:.10g} | "
+            f"PnL {pnl:+.1f}% | SL ${t['stop_loss']:.10g}"
+        )
+    if not trades:
+        lines.append("  (none)")
+
+    if pending:
+        lines.append(f"\nPENDING ({len(pending)}):")
+        for p in pending:
+            lines.append(f"  {p['name']} ({p['symbol']}) conf {p['confidence']}/10 @ ${p['rec_price']:.10g}")
+
+    if history:
+        lines.append(f"\nLAST {len(history)} CLOSED:")
+        for h in history:
+            lines.append(
+                f"  #{h.get('trade_id','?')} {h.get('token_name','?')} | "
+                f"{h.get('result','?')} {h.get('pnl_pct', 0):+.1f}% | {h.get('exit_reason','?')}"
+            )
+
+    lines.append(
+        f"\nSTATS: {stats.get('total_trades',0)} trades | "
+        f"{stats.get('wins',0)}W-{stats.get('losses',0)}L | "
+        f"WR {stats.get('win_rate',0)}% | Avg {stats.get('avg_pnl_pct',0):+.1f}%"
+    )
+
+    if picks:
+        lines.append(f"\nRECENT PICKS:")
+        for pk in picks:
+            lines.append(
+                f"  {pk.get('name','?')} conf {pk.get('confidence','?')}/10 | "
+                f"entry ${pk.get('entry_price',0):.10g} | {pk.get('status', 'active')}"
+            )
+
+    if rules:
+        lines.append(f"\nTOP RULES:")
+        for r in rules[-5:]:
+            lines.append(f"  - {r}")
+
+    return "\n".join(lines)
+
+
+def handle_user_messages(pb):
+    """Check for user messages and reply using AI with scanner context."""
+    last_offset = pb.get("last_update_id", 0)
+    updates = get_telegram_updates(offset=last_offset + 1 if last_offset else None)
+
+    if not updates:
+        return
+
+    replies_sent = 0
+    for update in updates:
+        pb["last_update_id"] = update["update_id"]
+
+        msg = update.get("message", {})
+        text = msg.get("text", "").strip()
+        chat_id = str(msg.get("chat", {}).get("id", ""))
+
+        if not text or chat_id != USER_ID:
+            continue
+
+        # Build context and reply with AI
+        context = build_chat_context(pb)
+
+        system = (
+            "You are a Solana memecoin scanner assistant. Short, direct replies. "
+            "Talk casual like a trading buddy. Use data below to answer.\n"
+            "If user asks to close a trade or change something, confirm what you'd do "
+            "and note it takes effect next scan cycle.\n"
+            "Keep replies under 300 words.\n\n"
+            f"{context}"
+        )
+
+        reply = call_groq(system, text, temperature=0.6)
+        if reply:
+            if len(reply) > 4000:
+                reply = reply[:3997] + "..."
+            send_msg(f"\U0001f4ac {reply}")
+            replies_sent += 1
+
+    if replies_sent:
+        send_msg(f"\u2705 Replied to {replies_sent} message(s). Continuing scan...")
 
 
 # ============================================================
@@ -2121,32 +2226,24 @@ def extract_picks_json(response):
 
 def main():
     playbook = load_playbook()
+
+    # ---- STEP 0: Reply to any user messages ----
+    handle_user_messages(playbook)
+
     scan_num = playbook.get("scans", 0) + 1
     perf = playbook.get("performance", {})
     total_picks = perf.get("total_picks", 0)
     win_rate = round((perf.get("wins", 0) / max(total_picks, 1)) * 100, 1) if total_picks > 0 else 0
-    rules_count = len(playbook.get("strategy_rules", []))
-    memory_count = len(playbook.get("trade_memory", []))
-
-    # Paper trade stats for header
     pt_stats = playbook.get("paper_trade_stats", {})
-    pt_total = pt_stats.get("total_trades", 0)
     pt_open = len(playbook.get("paper_trades", []))
-    pt_wr = pt_stats.get("win_rate", 0)
-
     pt_pending = len(playbook.get("pending_paper_trades", []))
 
     send_msg(
-        f"\U0001f50d Scan #{scan_num} starting...\n"
-        f"\U0001f4e1 Sources: DEXScreener Boosted + Profiles + New/PumpFun\n"
-        f"\U0001f9e0 Brain: {len(playbook.get('lessons', []))} patterns | "
-        f"Track record: {total_picks} picks, {win_rate}% win rate\n"
-        f"\U0001f4ca Trade memory: {memory_count} detailed records | "
-        f"Strategy rules: {rules_count}\n"
-        f"\U0001f4b5 Paper trades: {pt_open}/3 open | "
-        f"{pt_pending} pending | "
-        f"{pt_total} closed | {pt_wr}% win rate\n"
-        f"\u23f3 Self-learning scan with dynamic strategy..."
+        f"\U0001f50d Scan #{scan_num}\n"
+        f"\U0001f9e0 {len(playbook.get('lessons', []))}pat | {total_picks}picks {win_rate}%wr | "
+        f"{len(playbook.get('trade_memory', []))}mem | {len(playbook.get('strategy_rules', []))}rules\n"
+        f"\U0001f4b5 {pt_open}/3 open | {pt_pending} pending | "
+        f"{pt_stats.get('total_trades', 0)} closed {pt_stats.get('win_rate', 0)}%wr"
     )
 
     # ---- STEP 1: Check past picks (with full trade memory) ----
@@ -2172,45 +2269,32 @@ def main():
     # ---- STEP 1.7: Update ROI tiers and strategy rules ----
     update_roi_tiers(playbook)
 
-    # Generate dynamic strategy rules every 5 scans (once enough data)
     if scan_num % 5 == 0 and len(playbook.get("trade_memory", [])) >= 5:
-        send_msg("\U0001f504 Updating strategy rules from trade data...")
         generate_strategy_rules(playbook)
         rules = playbook.get("strategy_rules", [])
         if rules:
-            rules_text = "\n".join(f"  {i+1}. {r}" for i, r in enumerate(rules))
-            send_msg(f"\U0001f4dd New strategy rules:\n{rules_text}")
+            rules_text = "\n".join(f"  {i+1}. {r}" for i, r in enumerate(rules[-5:]))
+            send_msg(f"\U0001f504 Rules updated:\n{rules_text}")
 
     # ---- STEP 2: Gather new data ----
     tokens, stats = run_full_scan()
 
     if not tokens:
-        send_msg(
-            f"\U0001f634 No trending Solana tokens right now.\n"
-            f"Sources: Boosted ({stats.get('boosted', 0)}) | "
-            f"Profiles ({stats.get('profiles', 0)}) | "
-            f"New/PumpFun ({stats.get('new_pairs', 0)})\n"
-            "Checking again in 15 min."
-        )
+        send_msg(f"\U0001f634 Nothing trending. Next scan in 15m.")
         save_playbook(playbook)
         return
 
     token_data = "\n\n---\n\n".join(tokens)
     track_tokens(playbook, token_data)
 
-    send_msg(
-        f"\U0001f4ca Found {len(tokens)} tokens\n"
-        f"Boosted: {stats.get('boosted', 0)} | Profiles: {stats.get('profiles', 0)} | "
-        f"New/PumpFun: {stats.get('new_pairs', 0)}\n"
-        f"\U0001f52c Stage 1: Pattern-aware quick scan..."
-    )
+    send_msg(f"\U0001f4ca {len(tokens)} tokens found. Running Stage 1...")
 
     # ---- STEP 3: Stage 1 - Quick scan (now uses dynamic strategy rules) ----
     scan_prompt = build_scan_prompt(playbook)
     stage1_result = call_groq(scan_prompt, f"Analyze:\n\n{token_data}", temperature=0.5)
 
     if not stage1_result:
-        send_msg("\u26a0\ufe0f Stage 1 failed. Retrying next cycle.")
+        send_msg("\u26a0\ufe0f Stage 1 failed. Next cycle.")
         save_playbook(playbook)
         return
 
@@ -2220,17 +2304,14 @@ def main():
     picks = extract_picks_json(stage1_result)
     if picks:
         picks_summary = "\n".join(
-            f"#{p.get('rank','?')}: {p.get('name','?')} ({p.get('symbol','?')}) "
-            f"[Conf: {p.get('confidence','?')}/10] - {p.get('reason','?')}"
+            f"#{p.get('rank','?')} {p.get('name','?')} ({p.get('symbol','?')}) "
+            f"conf {p.get('confidence','?')}/10 â {p.get('reason','?')}"
             for p in picks
         )
-        send_msg(
-            f"\U0001f3af Stage 1 picks:\n{picks_summary}\n\n"
-            f"\U0001f52c Stage 2: Deep research with full trade intelligence..."
-        )
+        send_msg(f"\U0001f3af Picks:\n{picks_summary}\n\U0001f52c Stage 2 running...")
     else:
         picks_summary = stage1_result[:500]
-        send_msg("\U0001f3af Picks identified. Running deep research...")
+        send_msg("\U0001f3af Picks found. Stage 2...")
 
     # ---- STEP 4: Stage 2 - Deep research (with full self-learning context) ----
     research_prompt = build_research_prompt(playbook)
@@ -2264,24 +2345,9 @@ def main():
             except:
                 pass
 
-        active_count = len(playbook.get("active_picks", []))
-        rules_count = len(playbook.get("strategy_rules", []))
-        mistakes_count = len(playbook.get("mistake_log", []))
-        memory_count = len(playbook.get("trade_memory", []))
-
-        header = (
-            f"\U0001f4ca SCAN #{scan_num} - DEEP RESEARCH COMPLETE\n"
-            f"{'='*40}\n"
-            f"Tokens scanned: {len(tokens)} | Active picks: {active_count}\n"
-            f"Track record: {total_picks} picks | {win_rate}% win rate\n"
-            f"Brain: {len(playbook.get('lessons', []))} patterns | "
-            f"Trade memory: {memory_count}\n"
-            f"Strategy rules: {rules_count} | Mistakes logged: {mistakes_count}\n"
-            f"{'='*40}\n\n"
-        )
-        send_msg(header + research)
+        send_msg(f"\U0001f4ca SCAN #{scan_num} RESEARCH\n{'='*30}\n\n{research}")
     else:
-        send_msg("\u26a0\ufe0f Deep research failed. Stage 1 picks above still valid.")
+        send_msg("\u26a0\ufe0f Stage 2 failed. Stage 1 picks still valid.")
 
     # ---- STEP 5: Queue paper trades (confidence >= 7 picks) ----
     queued, blocked = queue_pending_paper_trades(
@@ -2294,16 +2360,12 @@ def main():
     open_count = len(playbook.get("paper_trades", []))
     pending_count = len(playbook.get("pending_paper_trades", []))
     if queued:
-        send_msg(
-            f"\U0001f4b5 Paper trades: {open_count}/3 open | "
-            f"{pending_count} pending confirmation | "
-            f"Queued this scan: {len(queued)}"
-        )
+        send_msg(f"\U0001f4b5 {open_count}/3 open | {pending_count} pending | +{len(queued)} queued")
     elif not blocked:
         if open_count >= 3:
-            send_msg("\U0001f4b5 Paper trade slots full (3/3). Monitoring existing positions.")
+            send_msg("\U0001f4b5 Slots full (3/3)")
         else:
-            send_msg("\U0001f4b5 No picks met confidence threshold (\u22657) for paper trading.")
+            send_msg("\U0001f4b5 No picks \u22657 confidence")
 
     save_playbook(playbook)
 
