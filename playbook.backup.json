@@ -41,56 +41,8 @@
       "note": "**\n\n* ADDED: Prioritize tokens with strong buy pressure and whale accumulation.\n* MODIFIED: Be more cautious with tokens that have similar patterns to past losing picks.\n* REMOVED: None\n\n**"
     }
   ],
-  "scans": 25,
+  "scans": 26,
   "tokens_seen": [
-    {
-      "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
-      "date": "2026-02-16T17:46"
-    },
-    {
-      "name": "\u30de\u30de\u30f3 (Maman)",
-      "date": "2026-02-16T17:46"
-    },
-    {
-      "name": "Black Wallstreet \u270a\ud83c\udffe (TULSA)",
-      "date": "2026-02-16T17:46"
-    },
-    {
-      "name": "Mog Coin (MOG)",
-      "date": "2026-02-16T17:46"
-    },
-    {
-      "name": "Crow with cigarette (SmokinCrow)",
-      "date": "2026-02-16T17:46"
-    },
-    {
-      "name": "Rizzmadan (Rizzmadan)",
-      "date": "2026-02-16T17:46"
-    },
-    {
-      "name": "MELON MUSK (MELON)",
-      "date": "2026-02-16T17:46"
-    },
-    {
-      "name": "SpaceX Grok (spok)",
-      "date": "2026-02-16T17:46"
-    },
-    {
-      "name": "b\u01d0ngw\u01d4 (\u4e19\u5348)",
-      "date": "2026-02-16T17:55"
-    },
-    {
-      "name": "Punch\u2019s Father (KOSUKE)",
-      "date": "2026-02-16T17:55"
-    },
-    {
-      "name": "Clavicular (Clav)",
-      "date": "2026-02-16T17:55"
-    },
-    {
-      "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
-      "date": "2026-02-16T17:55"
-    },
     {
       "name": "\u30de\u30de\u30f3 (Maman)",
       "date": "2026-02-16T17:55"
@@ -842,10 +794,149 @@
     {
       "name": "we're curing cancer, right? (right)",
       "date": "2026-02-16T21:03"
+    },
+    {
+      "name": "b\u01d0ngw\u01d4 (\u4e19\u5348)",
+      "date": "2026-02-16T21:36"
+    },
+    {
+      "name": "Punch\u2019s Father (KOSUKE)",
+      "date": "2026-02-16T21:36"
+    },
+    {
+      "name": "Mochi Panda (Mochi)",
+      "date": "2026-02-16T21:36"
+    },
+    {
+      "name": "Clavicular (Clav)",
+      "date": "2026-02-16T21:36"
+    },
+    {
+      "name": "firewu (FIREWU)",
+      "date": "2026-02-16T21:36"
+    },
+    {
+      "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
+      "date": "2026-02-16T21:36"
+    },
+    {
+      "name": "\u30de\u30de\u30f3 (Maman)",
+      "date": "2026-02-16T21:36"
+    },
+    {
+      "name": "ORGAZM (ORGAZM)",
+      "date": "2026-02-16T21:36"
+    },
+    {
+      "name": "Mog Coin (MOG)",
+      "date": "2026-02-16T21:36"
+    },
+    {
+      "name": "Wealth Mogging (WEALTHMOG)",
+      "date": "2026-02-16T21:36"
+    },
+    {
+      "name": "SpaceX Grok (spok)",
+      "date": "2026-02-16T21:36"
+    },
+    {
+      "name": "we're curing cancer, right? (right)",
+      "date": "2026-02-16T21:36"
     }
   ],
-  "last_scan": "2026-02-16T21:03",
-  "active_picks": [],
+  "last_scan": "2026-02-16T21:36",
+  "active_picks": [
+    {
+      "name": "Mochi Panda",
+      "symbol": "Mochi",
+      "contract": "8yyBAFFfCA4fKw1Ai1SExtSf6DmVckGGDT8XgHUopump",
+      "entry_price": 6.113e-06,
+      "confidence": 8,
+      "reason": "Moderate buy pressure, low volume spike, and high buy ratio",
+      "picked_at": "2026-02-16T21:36",
+      "scans_tracked": 0,
+      "peak_price": 6.113e-06,
+      "lowest_price": 6.113e-06,
+      "entry_snapshot": {
+        "market_cap": 6113.0,
+        "mc_tier": "micro (<100k)",
+        "liquidity": 6341.9,
+        "liq_to_mc_ratio": 1.0374,
+        "volume_1h": 373.31,
+        "volume_24h": 688281.48,
+        "vol_spike": 0.01,
+        "vol_tier": "normal",
+        "buy_ratio_1h": 1.36,
+        "pressure_tier": "balanced",
+        "price_change_1h": 12.27,
+        "price_change_6h": -99.63,
+        "price_change_24h": -83.15,
+        "dex": "pumpswap",
+        "hours_old": 17.5,
+        "source": "scan"
+      }
+    },
+    {
+      "name": "Punch\u2019s Father",
+      "symbol": "KOSUKE",
+      "contract": "62eFhsfHF5FnYnd1cmodYa8SfSwxJnJk5BrSwMh2pump",
+      "entry_price": 9.429e-06,
+      "confidence": 7,
+      "reason": "New token, low volume spike, and high buy ratio",
+      "picked_at": "2026-02-16T21:36",
+      "scans_tracked": 0,
+      "peak_price": 9.429e-06,
+      "lowest_price": 9.429e-06,
+      "entry_snapshot": {
+        "market_cap": 9428.0,
+        "mc_tier": "micro (<100k)",
+        "liquidity": 7859.4,
+        "liq_to_mc_ratio": 0.8336,
+        "volume_1h": 1181.99,
+        "volume_24h": 566598.43,
+        "vol_spike": 0.05,
+        "vol_tier": "normal",
+        "buy_ratio_1h": 0.9,
+        "pressure_tier": "selling_pressure",
+        "price_change_1h": -21.61,
+        "price_change_6h": 33.73,
+        "price_change_24h": -73.32,
+        "dex": "pumpswap",
+        "hours_old": 21.2,
+        "source": "scan"
+      }
+    },
+    {
+      "name": "Wealth Mogging",
+      "symbol": "WEALTHMOG",
+      "contract": "84CYQkyJwj2ywLQ25KZmJWUqYn3Vv568yyLNzLKQpump",
+      "entry_price": 7.513e-06,
+      "confidence": 6,
+      "reason": "New token, low volume spike, and moderate buy pressure",
+      "picked_at": "2026-02-16T21:36",
+      "scans_tracked": 0,
+      "peak_price": 7.513e-06,
+      "lowest_price": 7.513e-06,
+      "entry_snapshot": {
+        "market_cap": 7510.0,
+        "mc_tier": "micro (<100k)",
+        "liquidity": 6997.41,
+        "liq_to_mc_ratio": 0.9317,
+        "volume_1h": 863.8,
+        "volume_24h": 645112.28,
+        "vol_spike": 0.03,
+        "vol_tier": "normal",
+        "buy_ratio_1h": 1.55,
+        "pressure_tier": "strong_buying",
+        "price_change_1h": 13.26,
+        "price_change_6h": -74.27,
+        "price_change_24h": -79.25,
+        "dex": "pumpswap",
+        "hours_old": 23.6,
+        "source": "scan"
+      }
+    }
+  ],
   "pick_history": [
     {
       "name": "Punch\u2019s Father",
@@ -2562,10 +2653,10 @@
       "confidence": 8,
       "reason": "Strong buy pressure, Vol spike 3.96x",
       "opened_at": "2026-02-16T18:46",
-      "last_update": "2026-02-16T21:03",
+      "last_update": "2026-02-16T21:36",
       "peak_price": 8.095206999999999e-06,
       "lowest_price": 6.983e-06,
-      "scans_monitored": 13,
+      "scans_monitored": 14,
       "updates": [
         {
           "scan": 1,
@@ -2657,6 +2748,13 @@
           "action": "HOLD",
           "reason": "Monitoring (-13.7%)",
           "time": "2026-02-16T21:03"
+        },
+        {
+          "scan": 14,
+          "price": 6.983e-06,
+          "action": "HOLD",
+          "reason": "Monitoring (-13.7%)",
+          "time": "2026-02-16T21:36"
         }
       ],
       "entry_snapshot": {
@@ -2681,145 +2779,6 @@
       "confirmed_from_pending": true,
       "price_at_recommendation": 8.083e-06,
       "price_change_during_confirmation": -0.7
-    },
-    {
-      "trade_id": "PT-12-3",
-      "token_name": "Punch\u2019s Father",
-      "symbol": "KOSUKE",
-      "contract": "62eFhsfHF5FnYnd1cmodYa8SfSwxJnJk5BrSwMh2pump",
-      "entry_price": 6.9914e-06,
-      "original_rec_price": 6.929e-06,
-      "slippage_pct": 0.9,
-      "stop_loss": 9.742200000000001e-06,
-      "original_stop_loss": 5.24352075e-06,
-      "tp1": 1.3982722e-05,
-      "tp2": 2.4469763499999998e-05,
-      "tp3": 4.8939526999999995e-05,
-      "tp1_hit": false,
-      "tp2_hit": false,
-      "status": "OPEN",
-      "confidence": 7,
-      "reason": "Strong buy pressure, Whale accumulation",
-      "opened_at": "2026-02-16T18:46",
-      "last_update": "2026-02-16T21:03",
-      "peak_price": 1.249e-05,
-      "lowest_price": 6.551e-06,
-      "scans_monitored": 13,
-      "updates": [
-        {
-          "scan": 1,
-          "price": 6.929e-06,
-          "action": "HOLD",
-          "reason": "Monitoring (-0.9%)",
-          "time": "2026-02-16T18:47"
-        },
-        {
-          "scan": 2,
-          "price": 6.551e-06,
-          "action": "HOLD",
-          "reason": "Monitoring (-6.3%)",
-          "time": "2026-02-16T19:06"
-        },
-        {
-          "scan": 3,
-          "price": 9.653e-06,
-          "action": "HOLD",
-          "reason": "Monitoring (+38.1%)",
-          "time": "2026-02-16T19:22"
-        },
-        {
-          "scan": 4,
-          "price": 1.214e-05,
-          "action": "HOLD",
-          "reason": "Monitoring (+73.6%)",
-          "time": "2026-02-16T19:25"
-        },
-        {
-          "scan": 5,
-          "price": 1.193e-05,
-          "action": "HOLD",
-          "reason": "Monitoring (+70.6%)",
-          "time": "2026-02-16T19:27"
-        },
-        {
-          "scan": 6,
-          "price": 1.236e-05,
-          "action": "HOLD",
-          "reason": "Monitoring (+76.8%)",
-          "time": "2026-02-16T19:27"
-        },
-        {
-          "scan": 7,
-          "price": 1.249e-05,
-          "action": "HOLD",
-          "reason": "Monitoring (+78.6%)",
-          "time": "2026-02-16T19:48"
-        },
-        {
-          "scan": 8,
-          "price": 1.163e-05,
-          "action": "HOLD",
-          "reason": "Monitoring (+66.3%)",
-          "time": "2026-02-16T19:50"
-        },
-        {
-          "scan": 9,
-          "price": 1.124e-05,
-          "action": "HOLD",
-          "reason": "Monitoring (+60.8%)",
-          "time": "2026-02-16T20:01"
-        },
-        {
-          "scan": 10,
-          "price": 1.227e-05,
-          "action": "HOLD",
-          "reason": "Monitoring (+75.5%)",
-          "time": "2026-02-16T20:18"
-        },
-        {
-          "scan": 11,
-          "price": 1.227e-05,
-          "action": "HOLD",
-          "reason": "Monitoring (+75.5%)",
-          "time": "2026-02-16T20:18"
-        },
-        {
-          "scan": 12,
-          "price": 1.086e-05,
-          "action": "HOLD",
-          "reason": "Monitoring (+55.3%)",
-          "time": "2026-02-16T20:22"
-        },
-        {
-          "scan": 13,
-          "price": 1.109e-05,
-          "action": "HOLD",
-          "reason": "Monitoring (+58.6%)",
-          "time": "2026-02-16T21:03"
-        }
-      ],
-      "entry_snapshot": {
-        "market_cap": 6930.0,
-        "mc_tier": "micro (<100k)",
-        "liquidity": 6703.29,
-        "liq_to_mc_ratio": 0.9673,
-        "volume_1h": 334.29,
-        "volume_24h": 560159.0,
-        "vol_spike": 0.01,
-        "vol_tier": "normal",
-        "buy_ratio_1h": 1.67,
-        "pressure_tier": "strong_buying",
-        "price_change_1h": 10.38,
-        "price_change_6h": -30.61,
-        "price_change_24h": -80.39,
-        "dex": "pumpswap",
-        "hours_old": 18.3
-      },
-      "safety_verdict": "SAFE",
-      "safety_score": 501,
-      "confirmed_from_pending": true,
-      "price_at_recommendation": 6.93e-06,
-      "price_change_during_confirmation": -0.0
     }
   ],
   "paper_trade_history": [
@@ -2853,29 +2812,112 @@
       "entry_liquidity": 23915.21,
       "entry_age_hours": 2.4,
       "failure_reason": ""
+    },
+    {
+      "trade_id": "PT-12-3",
+      "token_name": "Punch\u2019s Father",
+      "symbol": "KOSUKE",
+      "contract": "62eFhsfHF5FnYnd1cmodYa8SfSwxJnJk5BrSwMh2pump",
+      "entry_price": 6.9914e-06,
+      "exit_price": 9.429e-06,
+      "return_pct": 34.9,
+      "return_x": 1.35,
+      "peak_return_pct": 78.6,
+      "result": "WIN",
+      "reason_closed": "Stop loss hit at $9.429e-06 (SL: $9.7422e-06)",
+      "confidence_at_entry": 7,
+      "reason_entered": "Strong buy pressure, Whale accumulation",
+      "opened_at": "2026-02-16T18:46",
+      "closed_at": "2026-02-16T21:36",
+      "duration": "2h 50m",
+      "scans_monitored": 14,
+      "tp1_hit": false,
+      "tp2_hit": false,
+      "slippage_pct": 0.9,
+      "entry_vol_spike": 0.01,
+      "entry_buy_pressure": 1.67,
+      "entry_pressure_tier": "strong_buying",
+      "entry_whale_activity": "strong_buying",
+      "entry_market_cap": 6930.0,
+      "entry_mc_tier": "micro (<100k)",
+      "entry_liquidity": 6703.29,
+      "entry_age_hours": 18.3,
+      "failure_reason": ""
     }
   ],
   "paper_trade_stats": {
-    "total_trades": 1,
-    "wins": 1,
+    "total_trades": 2,
+    "wins": 2,
     "losses": 0,
     "win_rate": 100.0,
-    "avg_return_pct": 2.1,
-    "avg_return_x": 1.02,
+    "avg_return_pct": 18.5,
+    "avg_return_x": 1.19,
     "best_trade": {
-      "token": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
-      "return_pct": 2.1,
-      "return_x": 1.02
+      "token": "Punch\u2019s Father",
+      "return_pct": 34.9,
+      "return_x": 1.35
     },
     "worst_trade": {
       "token": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
       "return_pct": 2.1,
       "return_x": 1.02
     },
-    "current_streak": 1,
+    "current_streak": 2,
     "strategy_accuracy_pct": 100.0
   },
   "paper_trade_id_counter": 3,
-  "pending_paper_trades": [],
-  "last_update_id": 574228906
+  "pending_paper_trades": [
+    {
+      "pick": {
+        "rank": 1,
+        "name": "Mochi Panda",
+        "symbol": "Mochi",
+        "contract": "8yyBAFFfCA4fKw1Ai1SExtSf6DmVckGGDT8XgHUopump",
+        "entry_price": "6.113e-06",
+        "confidence": 8,
+        "reason": "Moderate buy pressure, low volume spike, and high buy ratio"
+      },
+      "trade_setup": {},
+      "scan_num": 26,
+      "contract": "8yyBAFFfCA4fKw1Ai1SExtSf6DmVckGGDT8XgHUopump",
+      "symbol": "MOCHI",
+      "name": "Mochi Panda",
+      "rec_price": 6.113e-06,
+      "price_at_queue": 6.113e-06,
+      "confidence": 8,
+      "queued_at": "2026-02-16T21:36",
+      "safety_verdict": "SAFE",
+      "safety_score": 501,
+      "safety_risks": [
+        "Low amount of LP Providers (warn)"
+      ]
+    },
+    {
+      "pick": {
+        "rank": 2,
+        "name": "Punch\u2019s Father",
+        "symbol": "KOSUKE",
+        "contract": "62eFhsfHF5FnYnd1cmodYa8SfSwxJnJk5BrSwMh2pump",
+        "entry_price": "9.429e-06",
+        "confidence": 7,
+        "reason": "New token, low volume spike, and high buy ratio"
+      },
+      "trade_setup": {},
+      "scan_num": 26,
+      "contract": "62eFhsfHF5FnYnd1cmodYa8SfSwxJnJk5BrSwMh2pump",
+      "symbol": "KOSUKE",
+      "name": "Punch\u2019s Father",
+      "rec_price": 9.429e-06,
+      "price_at_queue": 9.429e-06,
+      "confidence": 7,
+      "queued_at": "2026-02-16T21:36",
+      "safety_verdict": "SAFE",
+      "safety_score": 501,
+      "safety_risks": [
+        "Low amount of LP Providers (warn)"
+      ]
+    }
+  ],
+  "last_update_id": 574228906,
+  "token_blacklist": {}
 }
