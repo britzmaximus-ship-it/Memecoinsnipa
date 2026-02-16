@@ -1,8 +1,7 @@
 """
-scanner.py - Solana Memecoin Scanner (Fixed Telegram Version)
+scanner.py - Solana Memecoin Scanner (Working Version)
 
-Basic working version with plain text Telegram messages.
-Fetches tokens from DexScreener, logs results, sends updates.
+Fetches tokens from DexScreener, analyzes with Groq, sends plain-text Telegram alerts.
 """
 
 import os
@@ -51,17 +50,17 @@ log = logging.getLogger("scanner")
 
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 USER_ID = os.environ.get("TELEGRAM_USER_ID", "")
+GROQ_KEY = os.environ.get("GROQ_API_KEY", "")
 TAPI = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-if not BOT_TOKEN or not USER_ID:
-    raise EnvironmentError("Missing TELEGRAM_BOT_TOKEN or TELEGRAM_USER_ID")
+if not BOT_TOKEN or not USER_ID or not GROQ_KEY:
+    raise EnvironmentError("Missing TELEGRAM_BOT_TOKEN, TELEGRAM_USER_ID or GROQ_API_KEY")
 
 # ============================================================
-# TELEGRAM (Plain text - no parsing issues)
+# TELEGRAM (Plain text)
 # ============================================================
 
 def send_msg(text: str) -> None:
-    """Send message to Telegram as plain text."""
     for i in range(0, len(text), TELEGRAM_MSG_LIMIT):
         chunk = text[i : i + TELEGRAM_MSG_LIMIT]
         try:
@@ -201,6 +200,7 @@ def format_token_for_prompt(parsed: dict, contract: str, source: str) -> str:
         f"Vol 1h: ${parsed['volume_1h']:,.0f} | Spike: {parsed['vol_spike']}x\n"
         f"Buy/Sell 1h: {parsed['buy_ratio_1h']}\n"
         f"URL: {parsed['url']}\n"
+        "----------------------------------------\n"
     )
 
 # ============================================================
@@ -296,6 +296,37 @@ def run_full_scan() -> tuple[list[str], dict]:
     return tokens, stats
 
 # ============================================================
+# GROQ CALL
+# ============================================================
+
+def call_groq(system: str, prompt: str, temperature: float = 0.6) -> Optional[str]:
+    try:
+        resp = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "llama3-70b-8192",
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt[:8000]},
+                ],
+                "temperature": temperature,
+                "max_tokens": 400,
+            },
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            log.error(f"Groq error {resp.status_code}: {resp.text[:200]}")
+            return None
+        return resp.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        log.error(f"Groq request failed: {e}")
+        return None
+
+# ============================================================
 # MAIN
 # ============================================================
 
@@ -304,7 +335,6 @@ def main() -> None:
     log.info("SCANNER START")
     log.info("=" * 50)
 
-    # Test Telegram connection
     send_msg("Scanner started - Telegram connection OK! 🚀")
 
     tokens, stats = run_full_scan()
@@ -317,7 +347,18 @@ def main() -> None:
     token_data = "\n\n---\n\n".join(tokens)
     log.info(f"Found {len(tokens)} tokens")
 
-    send_msg(f"Scan complete!\nFound {len(tokens)} promising tokens.\n\nSummary:\n{stats}")
+    # Stage 1: Quick Groq picks
+    system_prompt = "You are a sharp Solana memecoin scanner. From the list below, pick the TOP 3 tokens with the best short-term pump potential. Reply ONLY with a numbered list: 1. Name (Symbol) - Contract - Reason (short)."
+    groq_response = call_groq(system_prompt, token_data, temperature=0.6)
+
+    picks_text = groq_response.strip() if groq_response else "No picks (Groq failed)"
+
+    send_msg(
+        f"Scan complete!\n"
+        f"Found {len(tokens)} promising tokens.\n\n"
+        f"Groq Top Picks:\n{picks_text}\n\n"
+        f"Stats: {stats}"
+    )
 
 if __name__ == "__main__":
     main()
