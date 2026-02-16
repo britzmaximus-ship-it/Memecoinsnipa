@@ -41,56 +41,8 @@
       "note": "**\n\n* ADDED: Prioritize tokens with strong buy pressure and whale accumulation.\n* MODIFIED: Be more cautious with tokens that have similar patterns to past losing picks.\n* REMOVED: None\n\n**"
     }
   ],
-  "scans": 23,
+  "scans": 24,
   "tokens_seen": [
-    {
-      "name": "Frog CEO (FROGCEO)",
-      "date": "2026-02-16T14:34"
-    },
-    {
-      "name": "Mog Coin (MOG)",
-      "date": "2026-02-16T14:34"
-    },
-    {
-      "name": "Crow with cigarette (SmokinCrow)",
-      "date": "2026-02-16T14:34"
-    },
-    {
-      "name": "MELON MUSK (MELON)",
-      "date": "2026-02-16T14:34"
-    },
-    {
-      "name": "Rizzmadan (Rizzmadan)",
-      "date": "2026-02-16T14:34"
-    },
-    {
-      "name": "SpaceX Grok (spok)",
-      "date": "2026-02-16T14:34"
-    },
-    {
-      "name": "Wealth Mogging (WEALTHMOG)",
-      "date": "2026-02-16T14:34"
-    },
-    {
-      "name": "we're curing cancer, right? (right)",
-      "date": "2026-02-16T14:34"
-    },
-    {
-      "name": "b\u01d0ngw\u01d4 (\u4e19\u5348)",
-      "date": "2026-02-16T17:09"
-    },
-    {
-      "name": "Punch\u2019s Father (KOSUKE)",
-      "date": "2026-02-16T17:09"
-    },
-    {
-      "name": "Mochi Panda (Mochi)",
-      "date": "2026-02-16T17:09"
-    },
-    {
-      "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
-      "date": "2026-02-16T17:09"
-    },
     {
       "name": "\u30de\u30de\u30f3 (Maman)",
       "date": "2026-02-16T17:09"
@@ -842,9 +794,57 @@
     {
       "name": "we're curing cancer, right? (right)",
       "date": "2026-02-16T20:18"
+    },
+    {
+      "name": "b\u01d0ngw\u01d4 (\u4e19\u5348)",
+      "date": "2026-02-16T20:22"
+    },
+    {
+      "name": "Punch\u2019s Father (KOSUKE)",
+      "date": "2026-02-16T20:22"
+    },
+    {
+      "name": "Mochi Panda (Mochi)",
+      "date": "2026-02-16T20:22"
+    },
+    {
+      "name": "Clavicular (Clav)",
+      "date": "2026-02-16T20:22"
+    },
+    {
+      "name": "firewu (FIREWU)",
+      "date": "2026-02-16T20:22"
+    },
+    {
+      "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
+      "date": "2026-02-16T20:22"
+    },
+    {
+      "name": "\u30de\u30de\u30f3 (Maman)",
+      "date": "2026-02-16T20:22"
+    },
+    {
+      "name": "ORGAZM (ORGAZM)",
+      "date": "2026-02-16T20:22"
+    },
+    {
+      "name": "Mog Coin (MOG)",
+      "date": "2026-02-16T20:22"
+    },
+    {
+      "name": "SpaceX Grok (spok)",
+      "date": "2026-02-16T20:22"
+    },
+    {
+      "name": "MELON MUSK (MELON)",
+      "date": "2026-02-16T20:22"
+    },
+    {
+      "name": "Wealth Mogging (WEALTHMOG)",
+      "date": "2026-02-16T20:22"
     }
   ],
-  "last_scan": "2026-02-16T20:18",
+  "last_scan": "2026-02-16T20:22",
   "active_picks": [],
   "pick_history": [
     {
@@ -2562,10 +2562,10 @@
       "confidence": 8,
       "reason": "Strong buy pressure, Vol spike 3.96x",
       "opened_at": "2026-02-16T18:46",
-      "last_update": "2026-02-16T20:18",
+      "last_update": "2026-02-16T20:22",
       "peak_price": 8.095206999999999e-06,
       "lowest_price": 6.983e-06,
-      "scans_monitored": 11,
+      "scans_monitored": 12,
       "updates": [
         {
           "scan": 1,
@@ -2643,6 +2643,13 @@
           "action": "HOLD",
           "reason": "Monitoring (-13.7%)",
           "time": "2026-02-16T20:18"
+        },
+        {
+          "scan": 12,
+          "price": 6.983e-06,
+          "action": "HOLD",
+          "reason": "Monitoring (-13.7%)",
+          "time": "2026-02-16T20:22"
         }
       ],
       "entry_snapshot": {
@@ -2687,10 +2694,10 @@
       "confidence": 7,
       "reason": "Strong buy pressure, Whale accumulation",
       "opened_at": "2026-02-16T18:46",
-      "last_update": "2026-02-16T20:18",
+      "last_update": "2026-02-16T20:22",
       "peak_price": 1.249e-05,
       "lowest_price": 6.551e-06,
-      "scans_monitored": 11,
+      "scans_monitored": 12,
       "updates": [
         {
           "scan": 1,
@@ -2768,6 +2775,13 @@
           "action": "HOLD",
           "reason": "Monitoring (+75.5%)",
           "time": "2026-02-16T20:18"
+        },
+        {
+          "scan": 12,
+          "price": 1.086e-05,
+          "action": "HOLD",
+          "reason": "Monitoring (+55.3%)",
+          "time": "2026-02-16T20:22"
         }
       ],
       "entry_snapshot": {
@@ -2849,5 +2863,5 @@
   },
   "paper_trade_id_counter": 3,
   "pending_paper_trades": [],
-  "last_update_id": 574228905
+  "last_update_id": 574228906
 }
