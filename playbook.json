@@ -41,56 +41,8 @@
       "note": "**\n\n* ADDED: Prioritize tokens with strong buy pressure and whale accumulation.\n* MODIFIED: Be more cautious with tokens that have similar patterns to past losing picks.\n* REMOVED: None\n\n**"
     }
   ],
-  "scans": 24,
+  "scans": 25,
   "tokens_seen": [
-    {
-      "name": "\u30de\u30de\u30f3 (Maman)",
-      "date": "2026-02-16T17:09"
-    },
-    {
-      "name": "Black Wallstreet \u270a\ud83c\udffe (TULSA)",
-      "date": "2026-02-16T17:09"
-    },
-    {
-      "name": "Mog Coin (MOG)",
-      "date": "2026-02-16T17:09"
-    },
-    {
-      "name": "Crow with cigarette (SmokinCrow)",
-      "date": "2026-02-16T17:09"
-    },
-    {
-      "name": "MELON MUSK (MELON)",
-      "date": "2026-02-16T17:09"
-    },
-    {
-      "name": "Rizzmadan (Rizzmadan)",
-      "date": "2026-02-16T17:09"
-    },
-    {
-      "name": "SpaceX Grok (spok)",
-      "date": "2026-02-16T17:09"
-    },
-    {
-      "name": "Wealth Mogging (WEALTHMOG)",
-      "date": "2026-02-16T17:09"
-    },
-    {
-      "name": "b\u01d0ngw\u01d4 (\u4e19\u5348)",
-      "date": "2026-02-16T17:46"
-    },
-    {
-      "name": "Punch\u2019s Father (KOSUKE)",
-      "date": "2026-02-16T17:46"
-    },
-    {
-      "name": "Mochi Panda (Mochi)",
-      "date": "2026-02-16T17:46"
-    },
-    {
-      "name": "Clavicular (Clav)",
-      "date": "2026-02-16T17:46"
-    },
     {
       "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
       "date": "2026-02-16T17:46"
@@ -842,9 +794,57 @@
     {
       "name": "Wealth Mogging (WEALTHMOG)",
       "date": "2026-02-16T20:22"
+    },
+    {
+      "name": "b\u01d0ngw\u01d4 (\u4e19\u5348)",
+      "date": "2026-02-16T21:03"
+    },
+    {
+      "name": "Punch\u2019s Father (KOSUKE)",
+      "date": "2026-02-16T21:03"
+    },
+    {
+      "name": "Mochi Panda (Mochi)",
+      "date": "2026-02-16T21:03"
+    },
+    {
+      "name": "Clavicular (Clav)",
+      "date": "2026-02-16T21:03"
+    },
+    {
+      "name": "firewu (FIREWU)",
+      "date": "2026-02-16T21:03"
+    },
+    {
+      "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
+      "date": "2026-02-16T21:03"
+    },
+    {
+      "name": "\u30de\u30de\u30f3 (Maman)",
+      "date": "2026-02-16T21:03"
+    },
+    {
+      "name": "ORGAZM (ORGAZM)",
+      "date": "2026-02-16T21:03"
+    },
+    {
+      "name": "Mog Coin (MOG)",
+      "date": "2026-02-16T21:03"
+    },
+    {
+      "name": "Wealth Mogging (WEALTHMOG)",
+      "date": "2026-02-16T21:03"
+    },
+    {
+      "name": "SpaceX Grok (spok)",
+      "date": "2026-02-16T21:03"
+    },
+    {
+      "name": "we're curing cancer, right? (right)",
+      "date": "2026-02-16T21:03"
     }
   ],
-  "last_scan": "2026-02-16T20:22",
+  "last_scan": "2026-02-16T21:03",
   "active_picks": [],
   "pick_history": [
     {
@@ -1587,13 +1587,13 @@
     "Crow with cigarette: -99.4% loss. Peak was +92.8%. Reason picked: Strong buy pressure, Vol spike 3.28x, Whale accumulation"
   ],
   "strategy_rules": [
-    "Prioritize micro cap tokens (<100k) - these averaged +14.7% ROI with a 60.0% win rate",
-    "Require buy ratio >= 1.5 - trades with ratio <1.5 averaged lower ROI",
-    "Avoid mid cap tokens (500k-2M) - these averaged -57.8% ROI with a 0.0% win rate",
-    "Favor tokens with age between 6-24h - 55.6% of these trades were winners",
-    "Avoid tokens with extremely high 1h change at entry (>100%) - these often resulted in significant losses",
-    "Require vol spike >0.05x for consideration - lower vol spikes often resulted in losses",
-    "Avoid tokens older than 24h - only 1 trade older than 24h was profitable"
+    "Prioritize micro-cap tokens (<100k) - they had the highest win rate among all market cap categories.",
+    "Avoid tokens with extreme volume spikes - trades with vol_extreme_spike averaged -23.4% ROI with 0% win rate.",
+    "Require age between 6-24h - trades in this age range had the highest win rate (46.2%) among all age categories.",
+    "Avoid tokens with high volume spikes - trades with vol_high_spike averaged -70.7% ROI with 0% win rate.",
+    "Favor tokens with moderate buy pressure - trades with pressure_strong_buying and pressure_heavy_buying had lower win rates than pressure_balanced.",
+    "Avoid mid-cap tokens (500k-2M) - they had a -71.6% average ROI with 0% win rate.",
+    "Prioritize tokens with buy ratio > 1.5 - winning trades had an average buy ratio of 1.93, while losing trades had an average buy ratio of 1.63."
   ],
   "avoid_conditions": [
     "AVOID tokens already pumped >100% in 1h (lost -29.8% on \u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY))",
@@ -2562,10 +2562,10 @@
       "confidence": 8,
       "reason": "Strong buy pressure, Vol spike 3.96x",
       "opened_at": "2026-02-16T18:46",
-      "last_update": "2026-02-16T20:22",
+      "last_update": "2026-02-16T21:03",
       "peak_price": 8.095206999999999e-06,
       "lowest_price": 6.983e-06,
-      "scans_monitored": 12,
+      "scans_monitored": 13,
       "updates": [
         {
           "scan": 1,
@@ -2650,6 +2650,13 @@
           "action": "HOLD",
           "reason": "Monitoring (-13.7%)",
           "time": "2026-02-16T20:22"
+        },
+        {
+          "scan": 13,
+          "price": 6.983e-06,
+          "action": "HOLD",
+          "reason": "Monitoring (-13.7%)",
+          "time": "2026-02-16T21:03"
         }
       ],
       "entry_snapshot": {
@@ -2694,10 +2701,10 @@
       "confidence": 7,
       "reason": "Strong buy pressure, Whale accumulation",
       "opened_at": "2026-02-16T18:46",
-      "last_update": "2026-02-16T20:22",
+      "last_update": "2026-02-16T21:03",
       "peak_price": 1.249e-05,
       "lowest_price": 6.551e-06,
-      "scans_monitored": 12,
+      "scans_monitored": 13,
       "updates": [
         {
           "scan": 1,
@@ -2782,6 +2789,13 @@
           "action": "HOLD",
           "reason": "Monitoring (+55.3%)",
           "time": "2026-02-16T20:22"
+        },
+        {
+          "scan": 13,
+          "price": 1.109e-05,
+          "action": "HOLD",
+          "reason": "Monitoring (+58.6%)",
+          "time": "2026-02-16T21:03"
         }
       ],
       "entry_snapshot": {
