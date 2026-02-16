@@ -540,6 +540,74 @@ def run_full_scan():
 
 
 # ============================================================
+# TOKEN SAFETY CHECK (RugCheck API)
+# ============================================================
+
+def check_token_safety(contract_addr):
+    """Check token safety via RugCheck API.
+    Returns (is_safe: bool, score: int, risks: list[str], verdict: str)"""
+    try:
+        r = requests.get(
+            f"https://api.rugcheck.xyz/v1/tokens/{contract_addr}/report/summary",
+            timeout=10
+        )
+        if r.status_code != 200:
+            # API unavailable â default to safe so we don't block everything
+            return True, 0, [], "API unavailable"
+
+        data = r.json()
+        score = data.get("score", 0)
+        risks = data.get("risks", [])
+        rugged = data.get("rugged", False)
+
+        # Parse risk details
+        risk_names = []
+        danger_count = 0
+        critical_flags = []
+
+        for risk in risks:
+            level = risk.get("level", "")
+            name = risk.get("name", "unknown risk")
+            description = risk.get("description", "")
+            risk_names.append(f"{name} ({level})")
+
+            if level == "danger" or level == "error":
+                danger_count += 1
+                # Track the most critical risks
+                name_lower = name.lower()
+                if "mint" in name_lower and ("not" in name_lower or "enabled" in name_lower):
+                    critical_flags.append("MINT_AUTHORITY_ACTIVE")
+                if "freeze" in name_lower:
+                    critical_flags.append("FREEZE_AUTHORITY_ACTIVE")
+                if "rug" in name_lower or "scam" in name_lower:
+                    critical_flags.append("FLAGGED_SCAM")
+                if "copycat" in name_lower:
+                    critical_flags.append("COPYCAT_TOKEN")
+                if "top" in name_lower and ("holder" in name_lower or "10" in name_lower):
+                    critical_flags.append("CONCENTRATED_HOLDERS")
+
+        # Decision logic
+        if rugged:
+            return False, score, risk_names, "RUGGED"
+        if "FLAGGED_SCAM" in critical_flags:
+            return False, score, risk_names, "FLAGGED_SCAM"
+        if "MINT_AUTHORITY_ACTIVE" in critical_flags:
+            return False, score, risk_names, "MINT_NOT_REVOKED"
+        if danger_count >= 3:
+            return False, score, risk_names, f"{danger_count}_DANGER_FLAGS"
+        if "FREEZE_AUTHORITY_ACTIVE" in critical_flags and danger_count >= 2:
+            return False, score, risk_names, "FREEZE+DANGER"
+
+        # Passed safety checks
+        verdict = "SAFE" if danger_count == 0 else f"CAUTION ({danger_count} warnings)"
+        return True, score, risk_names, verdict
+
+    except Exception:
+        # API error â default to safe so we don't block everything
+        return True, 0, [], "API error"
+
+
+# ============================================================
 # PLAYBOOK + PERFORMANCE TRACKING + SELF-LEARNING ENGINE
 # ============================================================
 
@@ -576,6 +644,8 @@ def load_playbook():
                 "strategy_accuracy_pct": 0
             })
             pb.setdefault("paper_trade_id_counter", 0)
+            # === PENDING TRADES (confirmation delay) ===
+            pb.setdefault("pending_paper_trades", [])
             return pb
     except:
         return {
@@ -624,7 +694,9 @@ def load_playbook():
                 "current_streak": 0,
                 "strategy_accuracy_pct": 0
             },
-            "paper_trade_id_counter": 0
+            "paper_trade_id_counter": 0,
+            # === PENDING TRADES (confirmation delay) ===
+            "pending_paper_trades": []
         }
 
 
@@ -644,6 +716,7 @@ def save_playbook(pb):
     # === PAPER TRADE TRIMMING ===
     pb["paper_trades"] = pb.get("paper_trades", [])[:3]  # Max 3 open
     pb["paper_trade_history"] = pb.get("paper_trade_history", [])[-100:]
+    pb["pending_paper_trades"] = pb.get("pending_paper_trades", [])[:5]  # Max 5 pending
     with open("playbook.json", "w") as f:
         json.dump(pb, f, indent=2)
 
@@ -1337,18 +1410,54 @@ def create_paper_trade(pb, pick, trade_setup, scan_num):
     return trade
 
 
+def apply_trailing_stop(trade, current_price):
+    """Apply adaptive trailing stop loss. Tighter trail at higher profits.
+    Modifies trade['stop_loss'] in place. Returns (adjusted: bool, new_sl: float)."""
+    entry = trade["entry_price"]
+    peak = trade.get("peak_price", entry)
+    current_sl = trade["stop_loss"]
+
+    # Only trail if we have a peak above entry
+    if peak <= entry:
+        return False, current_sl
+
+    peak_return_pct = ((peak - entry) / entry) * 100
+
+    # Adaptive trail distance â tighter as profit grows
+    if peak_return_pct >= 400:      # 5x+ from entry
+        trail_pct = 0.15            # Trail 15% below peak
+    elif peak_return_pct >= 200:    # 3x+ from entry
+        trail_pct = 0.18            # Trail 18% below peak
+    elif peak_return_pct >= 100:    # 2x+ from entry
+        trail_pct = 0.20            # Trail 20% below peak
+    elif peak_return_pct >= 50:     # 1.5x+ from entry
+        trail_pct = 0.22            # Trail 22% below peak
+    else:
+        trail_pct = 0.25            # Trail 25% below peak
+
+    trailing_sl = peak * (1 - trail_pct)
+
+    # Never move SL down â only up
+    if trailing_sl > current_sl:
+        trade["stop_loss"] = trailing_sl
+        return True, trailing_sl
+
+    return False, current_sl
+
+
 def evaluate_trade_action(trade, current_price, current_data):
     """Evaluate what action to take on an open paper trade.
-    Returns (action, reason) tuple."""
+    Returns (action, reason) tuple.
+    NOTE: apply_trailing_stop() should be called BEFORE this function."""
     entry = trade["entry_price"]
-    sl = trade["stop_loss"]
+    sl = trade["stop_loss"]  # May already be updated by trailing stop
     tp1 = trade["tp1"]
     tp2 = trade["tp2"]
     tp3 = trade["tp3"]
 
     return_pct = ((current_price - entry) / entry) * 100
 
-    # ---- STOP LOSS CHECK ----
+    # ---- STOP LOSS CHECK (uses trailing SL if updated) ----
     if current_price <= sl:
         return "EXIT", f"Stop loss hit at ${current_price:.10g} (SL: ${sl:.10g})"
 
@@ -1381,10 +1490,6 @@ def evaluate_trade_action(trade, current_price, current_data):
         # Liquidity rug: liquidity dropped significantly
         if entry_liq > 0 and liquidity < entry_liq * 0.3:
             return "EXIT", f"Liquidity drain: ${liquidity:,.0f} (was ${entry_liq:,.0f} at entry)"
-
-        # Move stop loss to breakeven if +50%
-        if return_pct >= 50 and sl < entry:
-            return "MOVE_SL", f"In profit +{return_pct:.1f}%, moving SL to breakeven"
 
         # Strong buy signal
         if buy_ratio >= 2.5 and vol_spike >= 2.0 and return_pct > 0:
@@ -1575,7 +1680,11 @@ def monitor_paper_trades(pb):
         if current_price < trade.get("lowest_price", float('inf')):
             trade["lowest_price"] = current_price
 
-        # Evaluate what to do
+        # Apply adaptive trailing stop BEFORE evaluating action
+        old_sl = trade["stop_loss"]
+        trail_adjusted, new_sl = apply_trailing_stop(trade, current_price)
+
+        # Evaluate what to do (uses updated SL from trailing stop)
         action, reason = evaluate_trade_action(trade, current_price, current_data)
         return_pct = round(((current_price - trade["entry_price"]) / trade["entry_price"]) * 100, 1)
 
@@ -1625,13 +1734,11 @@ def monitor_paper_trades(pb):
             )
 
         elif action == "MOVE_SL":
-            # Move SL to breakeven if not already
-            if trade["stop_loss"] < trade["entry_price"]:
-                trade["stop_loss"] = trade["entry_price"]
+            # Trailing stop already handled above â just report
             still_open.append(trade)
             report_lines.append(
                 f"\U0001f6e1\ufe0f {trade['trade_id']} {trade['symbol']}: "
-                f"{return_pct:+.1f}% | SL tightened to ${trade['stop_loss']:.10g}\n"
+                f"{return_pct:+.1f}% | SL trailed to ${trade['stop_loss']:.10g}\n"
                 f"   {reason}"
             )
 
@@ -1663,11 +1770,16 @@ def monitor_paper_trades(pb):
                 vs = current_data.get("vol_spike", 0)
                 market_info = f" | Buy: {br}x | Vol: {vs}x"
 
+            # Show trailing stop adjustment
+            trail_info = ""
+            if trail_adjusted:
+                trail_info = f" | SL\u2191${new_sl:.10g}"
+
             report_lines.append(
                 f"{emoji} {trade['trade_id']} {trade['symbol']}: "
                 f"{return_pct:+.1f}% (peak: +{peak_ret}%) | "
                 f"HOLD{' | ' + status_tag if status_tag else ''}"
-                f"{market_info}"
+                f"{market_info}{trail_info}"
             )
 
     pb["paper_trades"] = still_open
@@ -1701,19 +1813,22 @@ def monitor_paper_trades(pb):
     return header + "\n".join(sections)
 
 
-def auto_open_paper_trades(pb, stage1_result, research_text, scan_num):
-    """Automatically open paper trades for high-confidence picks.
-    Only opens trades for confidence >= 7, max 3 open at a time."""
+def queue_pending_paper_trades(pb, stage1_result, research_text, scan_num):
+    """Queue high-confidence picks as PENDING paper trades.
+    They'll be confirmed (or rejected) on the next scan cycle.
+    Safety check via RugCheck happens here â unsafe tokens are blocked immediately."""
     open_trades = pb.get("paper_trades", [])
+    pending = pb.get("pending_paper_trades", [])
 
-    # Check max open trades limit
-    if len(open_trades) >= 3:
-        return []
+    # Check max open trades limit (open + pending combined)
+    total_slots_used = len(open_trades) + len(pending)
+    if total_slots_used >= 3:
+        return [], []
 
     # Get picks from Stage 1
     picks = extract_picks_json(stage1_result)
     if not picks:
-        return []
+        return [], []
 
     # Parse trade setups from Stage 2 research
     setups = parse_trade_setups(research_text) if research_text else {}
@@ -1723,34 +1838,207 @@ def auto_open_paper_trades(pb, stage1_result, research_text, scan_num):
     eligible.sort(key=lambda x: x.get("confidence", 0), reverse=True)
 
     if not eligible:
-        return []
+        return [], []
 
-    # Don't duplicate: check if token already has an open paper trade
+    # Don't duplicate: check contracts already open or pending
     open_contracts = {t["contract"] for t in open_trades}
+    pending_contracts = {t["contract"] for t in pending}
+    all_used = open_contracts | pending_contracts
 
-    new_trades = []
-    slots = 3 - len(open_trades)
+    queued = []
+    blocked = []
+    slots = 3 - total_slots_used
 
     for pick in eligible:
         if slots <= 0:
             break
 
         contract = pick.get("contract", "")
-        if not contract or contract in open_contracts:
+        if not contract or contract in all_used:
+            continue
+
+        # === RUGCHECK SAFETY GATE ===
+        is_safe, safety_score, risk_names, verdict = check_token_safety(contract)
+
+        if not is_safe:
+            blocked.append({
+                "name": pick.get("name", "?"),
+                "symbol": pick.get("symbol", "?"),
+                "contract": contract,
+                "verdict": verdict,
+                "risks": risk_names[:5],  # Top 5 risks
+                "confidence": pick.get("confidence", 0)
+            })
             continue
 
         symbol = pick.get("symbol", "?").upper()
         trade_setup = setups.get(symbol, {})
 
+        # Get current price for confirmation comparison
+        current_price = get_token_price(contract)
+
+        pending_entry = {
+            "pick": pick,
+            "trade_setup": trade_setup,
+            "scan_num": scan_num,
+            "contract": contract,
+            "symbol": symbol,
+            "name": pick.get("name", "?"),
+            "rec_price": float(str(pick.get("entry_price", "0")).replace("$", "").replace(",", "").strip()),
+            "price_at_queue": current_price,
+            "confidence": pick.get("confidence", 0),
+            "queued_at": datetime.now().isoformat()[:16],
+            "safety_verdict": verdict,
+            "safety_score": safety_score,
+            "safety_risks": risk_names[:5]
+        }
+
+        pending.append(pending_entry)
+        all_used.add(contract)
+        queued.append(pending_entry)
+        slots -= 1
+
+    pb["pending_paper_trades"] = pending
+    return queued, blocked
+
+
+def confirm_pending_trades(pb):
+    """Confirm or reject pending paper trades from the previous scan.
+    A pending trade is CONFIRMED if:
+      1. Price hasn't dumped >15% since recommendation
+      2. Buy pressure is still present (ratio >= 0.8)
+      3. Token is still reachable
+    Returns (confirmed_trades, rejected_info)."""
+    pending = pb.get("pending_paper_trades", [])
+    if not pending:
+        return [], []
+
+    open_trades = pb.get("paper_trades", [])
+    open_contracts = {t["contract"] for t in open_trades}
+
+    confirmed = []
+    rejected = []
+    scan_num = pb.get("scans", 0) + 1
+
+    for pt in pending:
+        contract = pt.get("contract", "")
+
+        # Skip if somehow a trade was already opened for this contract
+        if contract in open_contracts:
+            rejected.append({"name": pt["name"], "reason": "Already has open trade"})
+            continue
+
+        # Max 3 open trades
+        if len(open_trades) >= 3:
+            rejected.append({"name": pt["name"], "reason": "Trade slots full (3/3)"})
+            continue
+
+        # Get current price
+        current_price = get_token_price(contract)
+        if current_price is None:
+            rejected.append({"name": pt["name"], "reason": "Token unreachable after 1 scan"})
+            continue
+
+        rec_price = pt.get("rec_price", 0)
+        if rec_price <= 0:
+            rejected.append({"name": pt["name"], "reason": "Invalid recommendation price"})
+            continue
+
+        # Check: price hasn't dumped >15% since recommendation
+        price_change = ((current_price - rec_price) / rec_price) * 100
+        if price_change < -15:
+            rejected.append({
+                "name": pt["name"],
+                "reason": f"Price dumped {price_change:.1f}% since recommendation"
+            })
+            continue
+
+        # Check: buy pressure still present
+        current_data = get_token_full_data(contract)
+        if current_data:
+            buy_ratio = current_data.get("buy_ratio_1h", 1.0)
+            if buy_ratio < 0.8:
+                rejected.append({
+                    "name": pt["name"],
+                    "reason": f"Buy pressure collapsed (ratio: {buy_ratio})"
+                })
+                continue
+
+        # === CONFIRMED â create the actual paper trade ===
+        # Use CURRENT price as entry (more realistic after delay)
+        pick = pt.get("pick", {})
+        pick["entry_price"] = current_price  # Override with current price
+        trade_setup = pt.get("trade_setup", {})
+
         trade = create_paper_trade(pb, pick, trade_setup, scan_num)
         if trade:
+            # Tag with safety and confirmation info
+            trade["safety_verdict"] = pt.get("safety_verdict", "unknown")
+            trade["safety_score"] = pt.get("safety_score", 0)
+            trade["confirmed_from_pending"] = True
+            trade["price_at_recommendation"] = rec_price
+            trade["price_change_during_confirmation"] = round(price_change, 1)
+
             open_trades.append(trade)
             open_contracts.add(contract)
-            new_trades.append(trade)
-            slots -= 1
+            confirmed.append(trade)
 
+    # Clear pending list â all processed
+    pb["pending_paper_trades"] = []
     pb["paper_trades"] = open_trades
-    return new_trades
+
+    return confirmed, rejected
+
+
+def format_pending_alert(queued_entries, blocked_entries):
+    """Format Telegram message for queued and blocked trades."""
+    lines = []
+
+    if queued_entries:
+        lines.append(f"\u23f3 PAPER TRADES QUEUED ({len(queued_entries)}) â confirming next scan:")
+        for pt in queued_entries:
+            lines.append(
+                f"   \U0001f7e1 {pt['name']} ({pt['symbol']}) | "
+                f"Conf: {pt['confidence']}/10 | "
+                f"Safety: {pt.get('safety_verdict', '?')} | "
+                f"Price: ${pt['rec_price']:.10g}"
+            )
+
+    if blocked_entries:
+        lines.append(f"\n\U0001f6ab BLOCKED BY SAFETY CHECK ({len(blocked_entries)}):")
+        for bt in blocked_entries:
+            risks_str = ", ".join(bt.get("risks", [])[:3]) or "multiple red flags"
+            lines.append(
+                f"   \u274c {bt['name']} ({bt['symbol']}) | "
+                f"Verdict: {bt['verdict']} | "
+                f"Risks: {risks_str}"
+            )
+
+    return "\n".join(lines) if lines else ""
+
+
+def format_confirmation_alert(confirmed, rejected):
+    """Format Telegram message for confirmed/rejected pending trades."""
+    lines = []
+
+    if confirmed:
+        lines.append(f"\u2705 PAPER TRADES CONFIRMED ({len(confirmed)}):")
+        for trade in confirmed:
+            pc = trade.get("price_change_during_confirmation", 0)
+            pc_str = f"{pc:+.1f}%" if pc else "same"
+            lines.append(
+                f"   \U0001f7e2 {trade['token_name']} ({trade['symbol']}) | "
+                f"Entry: ${trade['entry_price']:.10g} | "
+                f"Price since rec: {pc_str} | "
+                f"Safety: {trade.get('safety_verdict', '?')}"
+            )
+
+    if rejected:
+        lines.append(f"\n\u274c PENDING TRADES REJECTED ({len(rejected)}):")
+        for rej in rejected:
+            lines.append(f"   \U0001f534 {rej['name']}: {rej['reason']}")
+
+    return "\n".join(lines) if lines else ""
 
 
 def format_new_trade_alert(trade):
@@ -1846,6 +2134,8 @@ def main():
     pt_open = len(playbook.get("paper_trades", []))
     pt_wr = pt_stats.get("win_rate", 0)
 
+    pt_pending = len(playbook.get("pending_paper_trades", []))
+
     send_msg(
         f"\U0001f50d Scan #{scan_num} starting...\n"
         f"\U0001f4e1 Sources: DEXScreener Boosted + Profiles + New/PumpFun\n"
@@ -1854,6 +2144,7 @@ def main():
         f"\U0001f4ca Trade memory: {memory_count} detailed records | "
         f"Strategy rules: {rules_count}\n"
         f"\U0001f4b5 Paper trades: {pt_open}/3 open | "
+        f"{pt_pending} pending | "
         f"{pt_total} closed | {pt_wr}% win rate\n"
         f"\u23f3 Self-learning scan with dynamic strategy..."
     )
@@ -1868,7 +2159,17 @@ def main():
     if pt_report:
         send_msg(pt_report)
 
-    # ---- STEP 1.6: Update ROI tiers and strategy rules ----
+    # ---- STEP 1.6: Confirm pending paper trades from previous scan ----
+    if playbook.get("pending_paper_trades"):
+        confirmed, rejected = confirm_pending_trades(playbook)
+        conf_alert = format_confirmation_alert(confirmed, rejected)
+        if conf_alert:
+            send_msg(conf_alert)
+        if confirmed:
+            for trade in confirmed:
+                send_msg(format_new_trade_alert(trade))
+
+    # ---- STEP 1.7: Update ROI tiers and strategy rules ----
     update_roi_tiers(playbook)
 
     # Generate dynamic strategy rules every 5 scans (once enough data)
@@ -1982,19 +2283,23 @@ def main():
     else:
         send_msg("\u26a0\ufe0f Deep research failed. Stage 1 picks above still valid.")
 
-    # ---- STEP 5: Auto paper trade (confidence >= 7 picks) ----
-    new_trades = auto_open_paper_trades(
+    # ---- STEP 5: Queue paper trades (confidence >= 7 picks) ----
+    queued, blocked = queue_pending_paper_trades(
         playbook, stage1_result, research or "", scan_num
     )
-    if new_trades:
-        for trade in new_trades:
-            send_msg(format_new_trade_alert(trade))
+    pending_alert = format_pending_alert(queued, blocked)
+    if pending_alert:
+        send_msg(pending_alert)
+
+    open_count = len(playbook.get("paper_trades", []))
+    pending_count = len(playbook.get("pending_paper_trades", []))
+    if queued:
         send_msg(
-            f"\U0001f4b5 Paper trades: {len(playbook.get('paper_trades', []))}/3 open | "
-            f"New this scan: {len(new_trades)}"
+            f"\U0001f4b5 Paper trades: {open_count}/3 open | "
+            f"{pending_count} pending confirmation | "
+            f"Queued this scan: {len(queued)}"
         )
-    else:
-        open_count = len(playbook.get("paper_trades", []))
+    elif not blocked:
         if open_count >= 3:
             send_msg("\U0001f4b5 Paper trade slots full (3/3). Monitoring existing positions.")
         else:
