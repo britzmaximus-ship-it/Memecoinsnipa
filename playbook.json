@@ -27,9 +27,13 @@
     {
       "date": "2026-02-16",
       "note": "**\n\n* Based on my results, I will add a new rule to prioritize tokens with strong buy pressure and whale accumulation.\n* I will modify my rule to be more cautious with tokens that have similar patterns to my past losing picks.\n\n**"
+    },
+    {
+      "date": "2026-02-16",
+      "note": "**\n\n* ADDED: Prioritize tokens with strong buy pressure and whale accumulation.\n* MODIFIED: Be more cautious with tokens that have similar patterns to past losing picks.\n* REMOVED: None\n\n**"
     }
   ],
-  "scans": 7,
+  "scans": 8,
   "tokens_seen": [
     {
       "name": "\u30b8\u30e5\u30f3\u30b2\u30eb\u30b9\u30b3\u30b0 (DJUNG)",
@@ -366,100 +370,58 @@
     {
       "name": "we're curing cancer, right? (right)",
       "date": "2026-02-16T14:34"
+    },
+    {
+      "name": "b\u01d0ngw\u01d4 (\u4e19\u5348)",
+      "date": "2026-02-16T17:09"
+    },
+    {
+      "name": "Punch\u2019s Father (KOSUKE)",
+      "date": "2026-02-16T17:09"
+    },
+    {
+      "name": "Mochi Panda (Mochi)",
+      "date": "2026-02-16T17:09"
+    },
+    {
+      "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
+      "date": "2026-02-16T17:09"
+    },
+    {
+      "name": "\u30de\u30de\u30f3 (Maman)",
+      "date": "2026-02-16T17:09"
+    },
+    {
+      "name": "Black Wallstreet \u270a\ud83c\udffe (TULSA)",
+      "date": "2026-02-16T17:09"
+    },
+    {
+      "name": "Mog Coin (MOG)",
+      "date": "2026-02-16T17:09"
+    },
+    {
+      "name": "Crow with cigarette (SmokinCrow)",
+      "date": "2026-02-16T17:09"
+    },
+    {
+      "name": "MELON MUSK (MELON)",
+      "date": "2026-02-16T17:09"
+    },
+    {
+      "name": "Rizzmadan (Rizzmadan)",
+      "date": "2026-02-16T17:09"
+    },
+    {
+      "name": "SpaceX Grok (spok)",
+      "date": "2026-02-16T17:09"
+    },
+    {
+      "name": "Wealth Mogging (WEALTHMOG)",
+      "date": "2026-02-16T17:09"
     }
   ],
-  "last_scan": "2026-02-16T14:34",
+  "last_scan": "2026-02-16T17:09",
   "active_picks": [
-    {
-      "name": "Mog Coin",
-      "symbol": "MOG",
-      "contract": "4MdtwK7ezBemvAWsW32HuvVD7o7j89Y3poYwJpWopump",
-      "entry_price": 0.0003348,
-      "confidence": 8,
-      "reason": "High volume spike, strong buy pressure, and new pair",
-      "picked_at": "2026-02-16T08:26",
-      "scans_tracked": 6,
-      "peak_price": 0.000624,
-      "lowest_price": 0.0002929,
-      "entry_snapshot": {
-        "market_cap": 334808.0,
-        "mc_tier": "small (100k-500k)",
-        "liquidity": 49023.76,
-        "liq_to_mc_ratio": 0.1464,
-        "volume_1h": 73042.09,
-        "volume_24h": 1279494.48,
-        "vol_spike": 1.37,
-        "vol_tier": "normal",
-        "buy_ratio_1h": 1.4,
-        "pressure_tier": "balanced",
-        "price_change_1h": -14.53,
-        "price_change_6h": 150.0,
-        "price_change_24h": 832.0,
-        "dex": "pumpswap",
-        "hours_old": 6.7,
-        "source": "scan"
-      }
-    },
-    {
-      "name": "SpaceX Grok",
-      "symbol": "spok",
-      "contract": "zv4zxckp3Ybr3xLPDJZuqCysPg3ENvKgTgXh562pump",
-      "entry_price": 1.073e-05,
-      "confidence": 7,
-      "reason": "High buy/sell ratio, new pair, and heavy buy pressure",
-      "picked_at": "2026-02-16T08:26",
-      "scans_tracked": 6,
-      "peak_price": 1.094e-05,
-      "lowest_price": 8.42e-06,
-      "entry_snapshot": {
-        "market_cap": 10738.0,
-        "mc_tier": "micro (<100k)",
-        "liquidity": 8334.75,
-        "liq_to_mc_ratio": 0.7762,
-        "volume_1h": 2145.46,
-        "volume_24h": 488751.95,
-        "vol_spike": 0.11,
-        "vol_tier": "normal",
-        "buy_ratio_1h": 2.41,
-        "pressure_tier": "heavy_buying",
-        "price_change_1h": 74.16,
-        "price_change_6h": 59.07,
-        "price_change_24h": -69.54,
-        "dex": "pumpswap",
-        "hours_old": 11.5,
-        "source": "scan"
-      }
-    },
-    {
-      "name": "Punch\u2019s Father",
-      "symbol": "KOSUKE",
-      "contract": "62eFhsfHF5FnYnd1cmodYa8SfSwxJnJk5BrSwMh2pump",
-      "entry_price": 8.132e-06,
-      "confidence": 9,
-      "reason": "Strong buy pressure, WHALE accumulation, and high buy/sell ratio",
-      "picked_at": "2026-02-16T08:32",
-      "scans_tracked": 5,
-      "peak_price": 8.29e-06,
-      "lowest_price": 7.094e-06,
-      "entry_snapshot": {
-        "market_cap": 8132.0,
-        "mc_tier": "micro (<100k)",
-        "liquidity": 7286.34,
-        "liq_to_mc_ratio": 0.896,
-        "volume_1h": 1242.53,
-        "volume_24h": 554867.16,
-        "vol_spike": 0.05,
-        "vol_tier": "normal",
-        "buy_ratio_1h": 2.95,
-        "pressure_tier": "heavy_buying",
-        "price_change_1h": -28.77,
-        "price_change_6h": -55.61,
-        "price_change_24h": -76.99,
-        "dex": "pumpswap",
-        "hours_old": 8.1,
-        "source": "scan"
-      }
-    },
     {
       "name": "Mog Coin",
       "symbol": "MOG",
@@ -468,9 +430,9 @@
       "confidence": 8,
       "reason": "High volume spike, strong buy pressure, and WHALE accumulation",
       "picked_at": "2026-02-16T08:32",
-      "scans_tracked": 5,
+      "scans_tracked": 6,
       "peak_price": 0.000624,
-      "lowest_price": 0.0002929,
+      "lowest_price": 0.0002381,
       "entry_snapshot": {
         "market_cap": 342637.0,
         "mc_tier": "small (100k-500k)",
@@ -498,9 +460,9 @@
       "confidence": 7,
       "reason": "Strong buy pressure, high buy/sell ratio, and recent listing",
       "picked_at": "2026-02-16T08:32",
-      "scans_tracked": 5,
+      "scans_tracked": 6,
       "peak_price": 1.094e-05,
-      "lowest_price": 8.42e-06,
+      "lowest_price": 8.165e-06,
       "entry_snapshot": {
         "market_cap": 9841.0,
         "mc_tier": "micro (<100k)",
@@ -528,9 +490,9 @@
       "confidence": 9,
       "reason": "NEW, HEAVY buy pressure, and high buy/sell ratio",
       "picked_at": "2026-02-16T08:38",
-      "scans_tracked": 4,
+      "scans_tracked": 5,
       "peak_price": 8.29e-06,
-      "lowest_price": 7.094e-06,
+      "lowest_price": 6.332e-06,
       "entry_snapshot": {
         "market_cap": 7094.0,
         "mc_tier": "micro (<100k)",
@@ -558,9 +520,9 @@
       "confidence": 8,
       "reason": "NEW, high volume spike, and strong buy pressure",
       "picked_at": "2026-02-16T08:38",
-      "scans_tracked": 4,
+      "scans_tracked": 5,
       "peak_price": 0.000624,
-      "lowest_price": 0.0002929,
+      "lowest_price": 0.0002381,
       "entry_snapshot": {
         "market_cap": 301621.0,
         "mc_tier": "small (100k-500k)",
@@ -588,9 +550,9 @@
       "confidence": 7,
       "reason": "NEW, high buy/sell ratio, and strong recent price action",
       "picked_at": "2026-02-16T08:38",
-      "scans_tracked": 4,
+      "scans_tracked": 5,
       "peak_price": 3.52e-05,
-      "lowest_price": 1.144e-05,
+      "lowest_price": 9.526e-06,
       "entry_snapshot": {
         "market_cap": 19320.0,
         "mc_tier": "micro (<100k)",
@@ -618,9 +580,9 @@
       "confidence": 8,
       "reason": "Strong buy pressure and high buy/sell ratio",
       "picked_at": "2026-02-16T08:43",
-      "scans_tracked": 3,
+      "scans_tracked": 4,
       "peak_price": 8.29e-06,
-      "lowest_price": 7.173e-06,
+      "lowest_price": 6.332e-06,
       "entry_snapshot": {
         "market_cap": 7174.0,
         "mc_tier": "micro (<100k)",
@@ -648,9 +610,9 @@
       "confidence": 7,
       "reason": "High volume spike and strong recent price action",
       "picked_at": "2026-02-16T08:43",
-      "scans_tracked": 3,
+      "scans_tracked": 4,
       "peak_price": 0.000624,
-      "lowest_price": 0.0002929,
+      "lowest_price": 0.0002381,
       "entry_snapshot": {
         "market_cap": 408231.0,
         "mc_tier": "small (100k-500k)",
@@ -678,9 +640,9 @@
       "confidence": 6,
       "reason": "High buy/sell ratio and strong whale accumulation",
       "picked_at": "2026-02-16T08:43",
-      "scans_tracked": 3,
+      "scans_tracked": 4,
       "peak_price": 3.52e-05,
-      "lowest_price": 1.144e-05,
+      "lowest_price": 9.526e-06,
       "entry_snapshot": {
         "market_cap": 19351.0,
         "mc_tier": "micro (<100k)",
@@ -708,9 +670,9 @@
       "confidence": 9,
       "reason": "Heavy buy pressure, Vol spike 10.09x, Whale accumulation",
       "picked_at": "2026-02-16T10:33",
-      "scans_tracked": 2,
+      "scans_tracked": 3,
       "peak_price": 0.0003705,
-      "lowest_price": 7.156e-06,
+      "lowest_price": 4.479e-06,
       "entry_snapshot": {
         "market_cap": 370545.0,
         "mc_tier": "small (100k-500k)",
@@ -738,9 +700,9 @@
       "confidence": 8,
       "reason": "HEAVY buy pressure, Strong buy ratio",
       "picked_at": "2026-02-16T10:33",
-      "scans_tracked": 2,
+      "scans_tracked": 3,
       "peak_price": 8.29e-06,
-      "lowest_price": 8.058e-06,
+      "lowest_price": 6.332e-06,
       "entry_snapshot": {
         "market_cap": 8290.0,
         "mc_tier": "micro (<100k)",
@@ -768,9 +730,9 @@
       "confidence": 7,
       "reason": "High volume spike, Strong buy ratio, Low market cap",
       "picked_at": "2026-02-16T10:33",
-      "scans_tracked": 2,
+      "scans_tracked": 3,
       "peak_price": 0.000624,
-      "lowest_price": 0.0002929,
+      "lowest_price": 0.0002381,
       "entry_snapshot": {
         "market_cap": 325031.0,
         "mc_tier": "small (100k-500k)",
@@ -798,9 +760,9 @@
       "confidence": 8,
       "reason": "NEW pair, heavy buy pressure, and low market cap",
       "picked_at": "2026-02-16T12:03",
-      "scans_tracked": 1,
+      "scans_tracked": 2,
       "peak_price": 8.161e-06,
-      "lowest_price": 8.058e-06,
+      "lowest_price": 6.332e-06,
       "entry_snapshot": {
         "market_cap": 8161.0,
         "mc_tier": "micro (<100k)",
@@ -828,9 +790,9 @@
       "confidence": 7,
       "reason": "NEW pair, strong buy pressure, and low market cap",
       "picked_at": "2026-02-16T12:03",
-      "scans_tracked": 1,
+      "scans_tracked": 2,
       "peak_price": 5.272e-06,
-      "lowest_price": 4.93e-06,
+      "lowest_price": 4.541e-06,
       "entry_snapshot": {
         "market_cap": 5271.0,
         "mc_tier": "micro (<100k)",
@@ -858,9 +820,9 @@
       "confidence": 6,
       "reason": "NEW pair, strong buy pressure, and low market cap",
       "picked_at": "2026-02-16T12:03",
-      "scans_tracked": 1,
+      "scans_tracked": 2,
       "peak_price": 9.776e-06,
-      "lowest_price": 9.397e-06,
+      "lowest_price": 8.165e-06,
       "entry_snapshot": {
         "market_cap": 9397.0,
         "mc_tier": "micro (<100k)",
@@ -888,9 +850,9 @@
       "confidence": 8,
       "reason": "NEW, whale accumulation, strong buy pressure, and recent price surge",
       "picked_at": "2026-02-16T14:34",
-      "scans_tracked": 0,
+      "scans_tracked": 1,
       "peak_price": 0.0002929,
-      "lowest_price": 0.0002929,
+      "lowest_price": 0.0002381,
       "entry_snapshot": {
         "market_cap": 292953.0,
         "mc_tier": "small (100k-500k)",
@@ -918,8 +880,8 @@
       "confidence": 7,
       "reason": "NEW, whale accumulation, strong buy pressure, and recent price surge",
       "picked_at": "2026-02-16T14:34",
-      "scans_tracked": 0,
-      "peak_price": 0.0002385,
+      "scans_tracked": 1,
+      "peak_price": 0.0005251,
       "lowest_price": 0.0002385,
       "entry_snapshot": {
         "market_cap": 238502.0,
@@ -948,9 +910,9 @@
       "confidence": 6,
       "reason": "NEW, recent price surge, and good liquidity relative to market cap",
       "picked_at": "2026-02-16T14:34",
-      "scans_tracked": 0,
+      "scans_tracked": 1,
       "peak_price": 1.527e-05,
-      "lowest_price": 1.527e-05,
+      "lowest_price": 1.41e-05,
       "entry_snapshot": {
         "market_cap": 15618.0,
         "mc_tier": "micro (<100k)",
@@ -967,6 +929,96 @@
         "price_change_24h": 346.0,
         "dex": "pumpswap",
         "hours_old": 22.5,
+        "source": "scan"
+      }
+    },
+    {
+      "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
+      "symbol": "TEDDY",
+      "contract": "AdJSR8QaustnW2MupTy6TqzHWMmd8AVqgWE27VKtpump",
+      "entry_price": 0.000144,
+      "confidence": 9,
+      "reason": "Strong buy pressure, Vol spike 12.01x, Whale accumulation",
+      "picked_at": "2026-02-16T17:09",
+      "scans_tracked": 0,
+      "peak_price": 0.000144,
+      "lowest_price": 0.000144,
+      "entry_snapshot": {
+        "market_cap": 144021.0,
+        "mc_tier": "small (100k-500k)",
+        "liquidity": 29885.59,
+        "liq_to_mc_ratio": 0.2075,
+        "volume_1h": 133966.14,
+        "volume_24h": 267617.53,
+        "vol_spike": 12.01,
+        "vol_tier": "extreme_spike",
+        "buy_ratio_1h": 1.94,
+        "pressure_tier": "strong_buying",
+        "price_change_1h": 122.0,
+        "price_change_6h": 312.0,
+        "price_change_24h": 312.0,
+        "dex": "pumpswap",
+        "hours_old": 1.6,
+        "source": "scan"
+      }
+    },
+    {
+      "name": "Mochi Panda (Mochi)",
+      "symbol": "Mochi",
+      "contract": "8yyBAFFfCA4fKw1Ai1SExtSf6DmVckGGDT8XgHUopump",
+      "entry_price": 0.001683,
+      "confidence": 8,
+      "reason": "HEAVY buy pressure, Whale accumulation, High volume",
+      "picked_at": "2026-02-16T17:09",
+      "scans_tracked": 0,
+      "peak_price": 0.001683,
+      "lowest_price": 0.001683,
+      "entry_snapshot": {
+        "market_cap": 1683036.0,
+        "mc_tier": "mid (500k-2M)",
+        "liquidity": 974582.04,
+        "liq_to_mc_ratio": 0.5791,
+        "volume_1h": 1825.01,
+        "volume_24h": 683960.92,
+        "vol_spike": 0.06,
+        "vol_tier": "normal",
+        "buy_ratio_1h": 51.62,
+        "pressure_tier": "heavy_buying",
+        "price_change_1h": 0.54,
+        "price_change_6h": 28621.0,
+        "price_change_24h": 4539.0,
+        "dex": "pumpswap",
+        "hours_old": 13.0,
+        "source": "scan"
+      }
+    },
+    {
+      "name": "b\u01d0ngw\u01d4 (\u4e19\u5348)",
+      "symbol": "\u4e19\u5348",
+      "contract": "DMYNp65mub3i7LRpBdB66CgBAceLcQnv4gsWeCi6pump",
+      "entry_price": 0.001415,
+      "confidence": 7,
+      "reason": "Whale accumulation, Buy/sell ratio > 1.3 in last hour",
+      "picked_at": "2026-02-16T17:09",
+      "scans_tracked": 0,
+      "peak_price": 0.001415,
+      "lowest_price": 0.001415,
+      "entry_snapshot": {
+        "market_cap": 1415473.0,
+        "mc_tier": "mid (500k-2M)",
+        "liquidity": 127931.91,
+        "liq_to_mc_ratio": 0.0904,
+        "volume_1h": 22233.58,
+        "volume_24h": 336960.2,
+        "vol_spike": 1.58,
+        "vol_tier": "moderate",
+        "buy_ratio_1h": 1.33,
+        "pressure_tier": "balanced",
+        "price_change_1h": -6.78,
+        "price_change_6h": -9.23,
+        "price_change_24h": -5.19,
+        "dex": "pumpswap",
+        "hours_old": 747.2,
         "source": "scan"
       }
     }
