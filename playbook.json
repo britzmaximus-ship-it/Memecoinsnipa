@@ -41,7 +41,7 @@
       "note": "**\n\n* ADDED: Prioritize tokens with strong buy pressure and whale accumulation.\n* MODIFIED: Be more cautious with tokens that have similar patterns to past losing picks.\n* REMOVED: None\n\n**"
     }
   ],
-  "scans": 11,
+  "scans": 12,
   "tokens_seen": [
     {
       "name": "\u30b8\u30e5\u30f3\u30b2\u30eb\u30b9\u30b3\u30b0 (DJUNG)",
@@ -570,9 +570,57 @@
     {
       "name": "MELON MUSK (MELON)",
       "date": "2026-02-16T18:39"
+    },
+    {
+      "name": "b\u01d0ngw\u01d4 (\u4e19\u5348)",
+      "date": "2026-02-16T18:46"
+    },
+    {
+      "name": "Punch\u2019s Father (KOSUKE)",
+      "date": "2026-02-16T18:46"
+    },
+    {
+      "name": "Clavicular (Clav)",
+      "date": "2026-02-16T18:46"
+    },
+    {
+      "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
+      "date": "2026-02-16T18:46"
+    },
+    {
+      "name": "\u30de\u30de\u30f3 (Maman)",
+      "date": "2026-02-16T18:46"
+    },
+    {
+      "name": "ORGAZM (ORGAZM)",
+      "date": "2026-02-16T18:46"
+    },
+    {
+      "name": "Black Wallstreet \u270a\ud83c\udffe (TULSA)",
+      "date": "2026-02-16T18:46"
+    },
+    {
+      "name": "Mog Coin (MOG)",
+      "date": "2026-02-16T18:46"
+    },
+    {
+      "name": "Crow with cigarette (SmokinCrow)",
+      "date": "2026-02-16T18:46"
+    },
+    {
+      "name": "SpaceX Grok (spok)",
+      "date": "2026-02-16T18:46"
+    },
+    {
+      "name": "MELON MUSK (MELON)",
+      "date": "2026-02-16T18:46"
+    },
+    {
+      "name": "Wealth Mogging (WEALTHMOG)",
+      "date": "2026-02-16T18:46"
     }
   ],
-  "last_scan": "2026-02-16T18:39",
+  "last_scan": "2026-02-16T18:46",
   "active_picks": [
     {
       "name": "Punch\u2019s Father",
@@ -582,7 +630,7 @@
       "confidence": 8,
       "reason": "HEAVY buy pressure, Strong buy ratio",
       "picked_at": "2026-02-16T10:33",
-      "scans_tracked": 6,
+      "scans_tracked": 7,
       "peak_price": 8.29e-06,
       "lowest_price": 6.278e-06,
       "entry_snapshot": {
@@ -612,7 +660,7 @@
       "confidence": 7,
       "reason": "High volume spike, Strong buy ratio, Low market cap",
       "picked_at": "2026-02-16T10:33",
-      "scans_tracked": 6,
+      "scans_tracked": 7,
       "peak_price": 0.000624,
       "lowest_price": 0.0002381,
       "entry_snapshot": {
@@ -642,7 +690,7 @@
       "confidence": 8,
       "reason": "NEW pair, heavy buy pressure, and low market cap",
       "picked_at": "2026-02-16T12:03",
-      "scans_tracked": 5,
+      "scans_tracked": 6,
       "peak_price": 8.161e-06,
       "lowest_price": 6.278e-06,
       "entry_snapshot": {
@@ -672,7 +720,7 @@
       "confidence": 7,
       "reason": "NEW pair, strong buy pressure, and low market cap",
       "picked_at": "2026-02-16T12:03",
-      "scans_tracked": 5,
+      "scans_tracked": 6,
       "peak_price": 5.272e-06,
       "lowest_price": 4.048e-06,
       "entry_snapshot": {
@@ -702,9 +750,9 @@
       "confidence": 6,
       "reason": "NEW pair, strong buy pressure, and low market cap",
       "picked_at": "2026-02-16T12:03",
-      "scans_tracked": 5,
+      "scans_tracked": 6,
       "peak_price": 9.776e-06,
-      "lowest_price": 6.418e-06,
+      "lowest_price": 6.342e-06,
       "entry_snapshot": {
         "market_cap": 9397.0,
         "mc_tier": "micro (<100k)",
@@ -732,7 +780,7 @@
       "confidence": 8,
       "reason": "NEW, whale accumulation, strong buy pressure, and recent price surge",
       "picked_at": "2026-02-16T14:34",
-      "scans_tracked": 4,
+      "scans_tracked": 5,
       "peak_price": 0.0005117,
       "lowest_price": 0.0002381,
       "entry_snapshot": {
@@ -762,8 +810,8 @@
       "confidence": 7,
       "reason": "NEW, whale accumulation, strong buy pressure, and recent price surge",
       "picked_at": "2026-02-16T14:34",
-      "scans_tracked": 4,
-      "peak_price": 0.0005888,
+      "scans_tracked": 5,
+      "peak_price": 0.001083,
       "lowest_price": 0.0002385,
       "entry_snapshot": {
         "market_cap": 238502.0,
@@ -792,8 +840,8 @@
       "confidence": 6,
       "reason": "NEW, recent price surge, and good liquidity relative to market cap",
       "picked_at": "2026-02-16T14:34",
-      "scans_tracked": 4,
-      "peak_price": 1.606e-05,
+      "scans_tracked": 5,
+      "peak_price": 1.902e-05,
       "lowest_price": 1.361e-05,
       "entry_snapshot": {
         "market_cap": 15618.0,
@@ -822,7 +870,7 @@
       "confidence": 9,
       "reason": "Strong buy pressure, Vol spike 12.01x, Whale accumulation",
       "picked_at": "2026-02-16T17:09",
-      "scans_tracked": 3,
+      "scans_tracked": 4,
       "peak_price": 0.000144,
       "lowest_price": 8.794e-05,
       "entry_snapshot": {
@@ -852,7 +900,7 @@
       "confidence": 8,
       "reason": "HEAVY buy pressure, Whale accumulation, High volume",
       "picked_at": "2026-02-16T17:09",
-      "scans_tracked": 3,
+      "scans_tracked": 4,
       "peak_price": 0.001683,
       "lowest_price": 4.248e-06,
       "entry_snapshot": {
@@ -882,8 +930,8 @@
       "confidence": 7,
       "reason": "Whale accumulation, Buy/sell ratio > 1.3 in last hour",
       "picked_at": "2026-02-16T17:09",
-      "scans_tracked": 3,
-      "peak_price": 0.001421,
+      "scans_tracked": 4,
+      "peak_price": 0.001423,
       "lowest_price": 0.001375,
       "entry_snapshot": {
         "market_cap": 1415473.0,
@@ -912,7 +960,7 @@
       "confidence": 9,
       "reason": "Strong buy pressure, high buy/sell ratio, and relatively low market cap",
       "picked_at": "2026-02-16T17:46",
-      "scans_tracked": 2,
+      "scans_tracked": 3,
       "peak_price": 5.023e-06,
       "lowest_price": 4.248e-06,
       "entry_snapshot": {
@@ -942,8 +990,8 @@
       "confidence": 8,
       "reason": "High volume spike, strong buy pressure, and relatively low market cap",
       "picked_at": "2026-02-16T17:46",
-      "scans_tracked": 2,
-      "peak_price": 9.125e-05,
+      "scans_tracked": 3,
+      "peak_price": 0.0001104,
       "lowest_price": 8.794e-05,
       "entry_snapshot": {
         "market_cap": 87949.0,
@@ -972,7 +1020,7 @@
       "confidence": 7,
       "reason": "High volume spike, relatively low market cap, and strong recent price action",
       "picked_at": "2026-02-16T17:46",
-      "scans_tracked": 2,
+      "scans_tracked": 3,
       "peak_price": 5.577e-05,
       "lowest_price": 4.204e-05,
       "entry_snapshot": {
@@ -1002,8 +1050,8 @@
       "confidence": 9,
       "reason": "Strong buy pressure, Vol spike 5.68x, NEW PAIR",
       "picked_at": "2026-02-16T17:55",
-      "scans_tracked": 1,
-      "peak_price": 9.125e-05,
+      "scans_tracked": 2,
+      "peak_price": 0.0001104,
       "lowest_price": 8.97e-05,
       "entry_snapshot": {
         "market_cap": 91255.0,
@@ -1032,8 +1080,8 @@
       "confidence": 8,
       "reason": "HEAVY buy pressure, Vol spike 3.6x, Whale accumulation, NEW PAIR",
       "picked_at": "2026-02-16T17:55",
-      "scans_tracked": 1,
-      "peak_price": 0.0005618,
+      "scans_tracked": 2,
+      "peak_price": 0.001083,
       "lowest_price": 0.0004607,
       "entry_snapshot": {
         "market_cap": 460761.0,
@@ -1062,7 +1110,7 @@
       "confidence": 7,
       "reason": "NEW PAIR, Vol spike 24.0x, Strong recent price action",
       "picked_at": "2026-02-16T17:55",
-      "scans_tracked": 1,
+      "scans_tracked": 2,
       "peak_price": 5.385e-05,
       "lowest_price": 4.204e-05,
       "entry_snapshot": {
@@ -1092,9 +1140,9 @@
       "confidence": 8,
       "reason": "Strong buy pressure, Vol spike 3.96x",
       "picked_at": "2026-02-16T18:39",
-      "scans_tracked": 0,
+      "scans_tracked": 1,
       "peak_price": 8.083e-06,
-      "lowest_price": 8.083e-06,
+      "lowest_price": 8.023e-06,
       "entry_snapshot": {
         "market_cap": 8083.81,
         "mc_tier": "micro (<100k)",
@@ -1122,9 +1170,9 @@
       "confidence": 7,
       "reason": "Strong buy pressure, Whale accumulation",
       "picked_at": "2026-02-16T18:39",
-      "scans_tracked": 0,
+      "scans_tracked": 1,
       "peak_price": 6.93e-06,
-      "lowest_price": 6.93e-06,
+      "lowest_price": 6.929e-06,
       "entry_snapshot": {
         "market_cap": 6930.0,
         "mc_tier": "micro (<100k)",
@@ -1152,8 +1200,8 @@
       "confidence": 6,
       "reason": "Strong buy pressure, Vol spike 3.28x, Whale accumulation",
       "picked_at": "2026-02-16T18:39",
-      "scans_tracked": 0,
-      "peak_price": 0.0005618,
+      "scans_tracked": 1,
+      "peak_price": 0.001083,
       "lowest_price": 0.0005618,
       "entry_snapshot": {
         "market_cap": 561831.0,
@@ -1208,7 +1256,7 @@
       "entry_price": 9.19982e-05,
       "original_rec_price": 9.125e-05,
       "slippage_pct": 0.82,
-      "stop_loss": 6.89986875e-05,
+      "stop_loss": 8.280000000000001e-05,
       "original_stop_loss": 6.2e-05,
       "tp1": 0.000175,
       "tp2": 0.000262,
@@ -1219,10 +1267,10 @@
       "confidence": 8,
       "reason": "High volume spike, strong buy pressure, and relatively low market cap",
       "opened_at": "2026-02-16T17:54",
-      "last_update": "2026-02-16T18:39",
-      "peak_price": 9.199825e-05,
+      "last_update": "2026-02-16T18:46",
+      "peak_price": 0.0001104,
       "lowest_price": 8.97e-05,
-      "scans_monitored": 1,
+      "scans_monitored": 2,
       "updates": [
         {
           "scan": 1,
@@ -1230,6 +1278,13 @@
           "action": "HOLD",
           "reason": "Monitoring (-2.5%)",
           "time": "2026-02-16T18:39"
+        },
+        {
+          "scan": 2,
+          "price": 0.0001104,
+          "action": "HOLD",
+          "reason": "Monitoring (+20.0%)",
+          "time": "2026-02-16T18:46"
         }
       ],
       "entry_snapshot": {
@@ -1254,6 +1309,100 @@
       "confirmed_from_pending": true,
       "price_at_recommendation": 8.794e-05,
       "price_change_during_confirmation": 3.8
+    },
+    {
+      "trade_id": "PT-12-2",
+      "token_name": "ORGAZM",
+      "symbol": "ORGAZM",
+      "contract": "HisdZJZZ9MZvWCkuENFjp1yhzhemHEB52W3aYUXJpump",
+      "entry_price": 8.0952e-06,
+      "original_rec_price": 8.023e-06,
+      "slippage_pct": 0.9,
+      "stop_loss": 6.071405249999999e-06,
+      "original_stop_loss": 6.071405249999999e-06,
+      "tp1": 1.6190413999999998e-05,
+      "tp2": 2.83332245e-05,
+      "tp3": 5.6666449e-05,
+      "tp1_hit": false,
+      "tp2_hit": false,
+      "status": "OPEN",
+      "confidence": 8,
+      "reason": "Strong buy pressure, Vol spike 3.96x",
+      "opened_at": "2026-02-16T18:46",
+      "last_update": "2026-02-16T18:46",
+      "peak_price": 8.095206999999999e-06,
+      "lowest_price": 8.095206999999999e-06,
+      "scans_monitored": 0,
+      "updates": [],
+      "entry_snapshot": {
+        "market_cap": 8023.87,
+        "mc_tier": "micro (<100k)",
+        "liquidity": 0.0,
+        "liq_to_mc_ratio": 0.0,
+        "volume_1h": 3943.98,
+        "volume_24h": 21255.66,
+        "vol_spike": 4.45,
+        "vol_tier": "high_spike",
+        "buy_ratio_1h": 1.38,
+        "pressure_tier": "balanced",
+        "price_change_1h": 45.87,
+        "price_change_6h": 5.25,
+        "price_change_24h": 360.0,
+        "dex": "pumpfun",
+        "hours_old": 24.2
+      },
+      "safety_verdict": "SAFE",
+      "safety_score": 4645,
+      "confirmed_from_pending": true,
+      "price_at_recommendation": 8.083e-06,
+      "price_change_during_confirmation": -0.7
+    },
+    {
+      "trade_id": "PT-12-3",
+      "token_name": "Punch\u2019s Father",
+      "symbol": "KOSUKE",
+      "contract": "62eFhsfHF5FnYnd1cmodYa8SfSwxJnJk5BrSwMh2pump",
+      "entry_price": 6.9914e-06,
+      "original_rec_price": 6.929e-06,
+      "slippage_pct": 0.9,
+      "stop_loss": 5.24352075e-06,
+      "original_stop_loss": 5.24352075e-06,
+      "tp1": 1.3982722e-05,
+      "tp2": 2.4469763499999998e-05,
+      "tp3": 4.8939526999999995e-05,
+      "tp1_hit": false,
+      "tp2_hit": false,
+      "status": "OPEN",
+      "confidence": 7,
+      "reason": "Strong buy pressure, Whale accumulation",
+      "opened_at": "2026-02-16T18:46",
+      "last_update": "2026-02-16T18:46",
+      "peak_price": 6.991361e-06,
+      "lowest_price": 6.991361e-06,
+      "scans_monitored": 0,
+      "updates": [],
+      "entry_snapshot": {
+        "market_cap": 6930.0,
+        "mc_tier": "micro (<100k)",
+        "liquidity": 6703.29,
+        "liq_to_mc_ratio": 0.9673,
+        "volume_1h": 334.29,
+        "volume_24h": 560159.0,
+        "vol_spike": 0.01,
+        "vol_tier": "normal",
+        "buy_ratio_1h": 1.67,
+        "pressure_tier": "strong_buying",
+        "price_change_1h": 10.38,
+        "price_change_6h": -30.61,
+        "price_change_24h": -80.39,
+        "dex": "pumpswap",
+        "hours_old": 18.3
+      },
+      "safety_verdict": "SAFE",
+      "safety_score": 501,
+      "confirmed_from_pending": true,
+      "price_at_recommendation": 6.93e-06,
+      "price_change_during_confirmation": -0.0
     }
   ],
   "paper_trade_history": [],
@@ -1269,59 +1418,7 @@
     "current_streak": 0,
     "strategy_accuracy_pct": 0
   },
-  "paper_trade_id_counter": 1,
-  "pending_paper_trades": [
-    {
-      "pick": {
-        "rank": 1,
-        "name": "ORGAZM",
-        "symbol": "ORGAZM",
-        "contract": "HisdZJZZ9MZvWCkuENFjp1yhzhemHEB52W3aYUXJpump",
-        "entry_price": "0.000008083",
-        "confidence": 8,
-        "reason": "Strong buy pressure, Vol spike 3.96x"
-      },
-      "trade_setup": {},
-      "scan_num": 11,
-      "contract": "HisdZJZZ9MZvWCkuENFjp1yhzhemHEB52W3aYUXJpump",
-      "symbol": "ORGAZM",
-      "name": "ORGAZM",
-      "rec_price": 8.083e-06,
-      "price_at_queue": 8.083e-06,
-      "confidence": 8,
-      "queued_at": "2026-02-16T18:39",
-      "safety_verdict": "SAFE",
-      "safety_score": 4645,
-      "safety_risks": [
-        "Single holder ownership (warn)",
-        "High holder concentration (warn)"
-      ]
-    },
-    {
-      "pick": {
-        "rank": 2,
-        "name": "Punch\u2019s Father",
-        "symbol": "KOSUKE",
-        "contract": "62eFhsfHF5FnYnd1cmodYa8SfSwxJnJk5BrSwMh2pump",
-        "entry_price": "0.000006930",
-        "confidence": 7,
-        "reason": "Strong buy pressure, Whale accumulation"
-      },
-      "trade_setup": {},
-      "scan_num": 11,
-      "contract": "62eFhsfHF5FnYnd1cmodYa8SfSwxJnJk5BrSwMh2pump",
-      "symbol": "KOSUKE",
-      "name": "Punch\u2019s Father",
-      "rec_price": 6.93e-06,
-      "price_at_queue": 6.93e-06,
-      "confidence": 7,
-      "queued_at": "2026-02-16T18:39",
-      "safety_verdict": "SAFE",
-      "safety_score": 501,
-      "safety_risks": [
-        "Low amount of LP Providers (warn)"
-      ]
-    }
-  ],
+  "paper_trade_id_counter": 3,
+  "pending_paper_trades": [],
   "last_update_id": 574228897
 }
