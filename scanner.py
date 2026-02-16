@@ -1,5 +1,5 @@
 """
-scanner.py - Solana Memecoin Scanner v2.1
+scanner.py - Solana Memecoin Scanner v2.1 (Plain Text Telegram Fix)
 
 Self-learning memecoin scanner with paper trading engine.
 Runs on GitHub Actions every 15 minutes, sends alerts via Telegram,
@@ -43,7 +43,6 @@ TOKEN_BLACKLIST_HOURS = 24
 API_RATE_LIMIT_DELAY = 0.4
 API_MAX_RETRIES = 2
 API_TIMEOUT = 10
-CACHE_TTL = 300  # 5 min
 
 TELEGRAM_MSG_LIMIT = 4000
 TELEGRAM_SEND_TIMEOUT = 10
@@ -410,16 +409,17 @@ def format_token_for_prompt(parsed: dict, contract: str, source: str) -> str:
     )
 
 # ============================================================
-# TELEGRAM
+# TELEGRAM (Plain text - no MarkdownV2)
 # ============================================================
 
-def send_msg(text: str, parse_mode: str = "MarkdownV2") -> None:
+def send_msg(text: str) -> None:
+    """Send message to Telegram as plain text (no formatting issues)."""
     for i in range(0, len(text), TELEGRAM_MSG_LIMIT):
         chunk = text[i : i + TELEGRAM_MSG_LIMIT]
         try:
             r = requests.post(
                 f"{TAPI}/sendMessage",
-                json={"chat_id": USER_ID, "text": chunk, "parse_mode": parse_mode},
+                json={"chat_id": USER_ID, "text": chunk},
                 timeout=TELEGRAM_SEND_TIMEOUT,
             )
             if r.status_code != 200:
@@ -528,16 +528,20 @@ def main() -> None:
     log.info("SCANNER START")
     log.info("=" * 50)
 
+    # Test message to confirm Telegram works
+    send_msg("Test message: scanner.py is running and Telegram is connected! 🚀")
+
     tokens, stats = run_full_scan()
 
     if not tokens:
-        log.info("No tokens found")
+        log.info("No tokens found this scan")
+        send_msg("Scan complete. No trending tokens found this time.")
         return
 
     token_data = "\n\n---\n\n".join(tokens)
     log.info(f"Found {len(tokens)} tokens")
 
-    send_msg(f"Scan complete. Found {len(tokens)} tokens.")
+    send_msg(f"Scan complete. Found {len(tokens)} promising tokens.")
 
 if __name__ == "__main__":
     main()
