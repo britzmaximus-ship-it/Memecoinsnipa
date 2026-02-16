@@ -1,0 +1,31 @@
+{
+  "lessons": [],
+  "scans": 0,
+  "tokens_seen": [],
+  "last_scan": null,
+  "active_picks": [],
+  "pick_history": [],
+  "performance": {
+    "total_picks": 0,
+    "wins": 0,
+    "losses": 0,
+    "neutral": 0,
+    "avg_return_pct": 0,
+    "best_pick": {},
+    "worst_pick": {}
+  },
+  "win_patterns": [],
+  "lose_patterns": [],
+  "strategy_rules": [],
+  "avoid_conditions": [],
+  "mistake_log": [],
+  "roi_tiers": {},
+  "trade_memory": [],
+  "pattern_stats": {
+    "by_mc_tier": {},
+    "by_vol_tier": {},
+    "by_pressure_tier": {},
+    "by_age_group": {},
+    "by_source": {}
+  }
+}
