@@ -1,28 +1,15 @@
 """
-scanner.py - Solana Memecoin Scanner v2.0
+scanner.py - Solana Memecoin Scanner v2.2
 
 Self-learning memecoin scanner with paper trading engine.
 Runs on GitHub Actions every 15 minutes, sends alerts via Telegram,
 and persists learning state via playbook.json committed to git.
 
-Changes from v1:
-- Named constants for all magic numbers
-- Proper logging (file + stdout)
-- Exception handling with logging (no bare except)
-- Rate-limited API calls with retry logic
-- Token blacklist for recently-failed tokens
-- Shared DEX pair parser (eliminates duplication)
-- Prompt injection sanitization on token names
-- Structured JSON extraction for Stage 2 lessons
-- Strategy rule evolution (merge, not replace)
-- Playbook backup before save
-- Type hints on all functions
-- Deduplication of lessons
-
-v2.1 - Live Trading Integration:
-- Jupiter V6 API integration via trader.py
-- Real buy/sell execution when LIVE_TRADING_ENABLED=true
-- Wallet balance reporting in Telegram status
+Changes from v2.1:
+- Explicit Telegram alerts for every live buy/sell attempt with error details
+- Fixed Stage 2 timeout (increased to 120s, prompt trimming)
+- Better error visibility for debugging live trades
+- Trimmed research prompt to prevent Groq context overflow
 """
 
 import os
@@ -72,12 +59,22 @@ API_RATE_LIMIT_DELAY = 0.4            # Seconds between DexScreener API calls
 API_MAX_RETRIES = 2                   # Max retries for failed API calls
 API_TIMEOUT = 10                      # Default API timeout in seconds
 
+# -- Groq --
+GROQ_TIMEOUT_STAGE1 = 60              # Timeout for Stage 1 (short prompt)
+GROQ_TIMEOUT_STAGE2 = 120             # Timeout for Stage 2 (long prompt)
+GROQ_TIMEOUT_RULES = 90               # Timeout for rule evolution
+GROQ_MAX_TOKENS_STAGE1 = 2048         # Max output tokens for Stage 1
+GROQ_MAX_TOKENS_STAGE2 = 4096         # Max output tokens for Stage 2
+
 # -- Telegram --
 TELEGRAM_MSG_LIMIT = 4000             # Max chars per Telegram message
 TELEGRAM_SEND_TIMEOUT = 10            # Timeout for sending Telegram messages
 
 # -- Prompt safety --
 MAX_TOKEN_NAME_LEN = 50               # Truncate token names for prompt injection safety
+
+# -- Research prompt limits --
+MAX_RESEARCH_PROMPT_CHARS = 12000     # Trim research prompt if longer than this
 
 # -- Playbook trim limits --
 TRIM = {
@@ -852,19 +849,14 @@ Default criteria (replaced by learned rules once you have data):
 
 
 def build_research_prompt(pb: dict) -> str:
-    """Build Stage 2 deep research prompt with full performance context."""
-    prompt = """You are a sharp, street-smart Solana memecoin trading AI that LEARNS FROM REAL RESULTS.
-You talk like a real trading partner - casual, direct, hyped when something looks good, honest when it doesn't.
+    """Build Stage 2 deep research prompt with full performance context.
 
-Your personality:
-- Talk like you're texting a friend who trades
-- Use emojis naturally but don't overdo it
-- Be decisive - strong opinions backed by data
-- Reference your ACTUAL track record when making calls
-- Admit when your past picks were wrong and explain what you learned
+    v2.2: Trimmed to prevent Groq context overflow after many scans.
+    """
+    prompt = """You are a sharp Solana memecoin trading AI that LEARNS FROM REAL RESULTS.
+Talk like a real trading partner - casual, direct, decisive.
 
 IMPORTANT: Only pick coins that realistically have 2x-10x potential.
-Skip anything that looks pumped out or has no room to run.
 """
 
     stats = pb.get("performance", {})
@@ -878,121 +870,77 @@ Skip anything that looks pumped out or has no room to run.
         win_rate = round((wins / max(total_picks, 1)) * 100, 1)
 
         prompt += f"""
-YOUR REAL TRACK RECORD:
-- Total picks tracked: {total_picks}
-- Wins: {wins} | Losses: {losses}
-- Win rate: {win_rate}%
-- Average return: {avg_return:+.1f}%
+YOUR TRACK RECORD: {total_picks} picks | {wins}W-{losses}L | {win_rate}% WR | Avg: {avg_return:+.1f}%
 """
         if best.get("name"):
-            prompt += f"- Best pick: {best['name']} ({best.get('return_pct', 0):+.1f}%)\n"
+            prompt += f"Best: {best['name']} ({best.get('return_pct', 0):+.1f}%) | "
         if worst.get("name"):
-            prompt += f"- Worst pick: {worst['name']} ({worst.get('return_pct', 0):+.1f}%)\n"
-        prompt += "\nUSE THIS DATA. Adjust your picks based on what types of tokens tend to win/lose.\n"
+            prompt += f"Worst: {worst['name']} ({worst.get('return_pct', 0):+.1f}%)\n"
 
     roi_tiers = pb.get("roi_tiers", {})
     if roi_tiers:
-        prompt += "\n--- ROI ANALYSIS BY SETUP TYPE ---\n"
-        for tier_name, tier_data in roi_tiers.items():
-            prompt += f"- {tier_name}: avg ROI {tier_data.get('avg_roi', 0):+.1f}% across {tier_data.get('count', 0)} picks\n"
-        prompt += "PRIORITIZE setup types with the highest historical ROI.\n"
+        prompt += "\nBEST SETUPS BY ROI:\n"
+        sorted_tiers = sorted(roi_tiers.items(), key=lambda x: x[1]["avg_roi"], reverse=True)
+        for tier_name, tier_data in sorted_tiers[:5]:
+            prompt += f"- {tier_name}: avg {tier_data.get('avg_roi', 0):+.1f}% ({tier_data.get('count', 0)} trades)\n"
 
-    for label, key in [("PATTERNS THAT LED TO WINS", "win_patterns"), ("PATTERNS THAT LED TO LOSSES", "lose_patterns")]:
+    for label, key, limit in [
+        ("WIN PATTERNS", "win_patterns", 5),
+        ("LOSS PATTERNS", "lose_patterns", 5),
+    ]:
         patterns = pb.get(key, [])
         if patterns:
             prompt += f"\n{label}:\n"
-            for p in patterns[-10:]:
-                prompt += f"- {p}\n"
+            for p in patterns[-limit:]:
+                prompt += f"- {p[:200]}\n"
 
     rules = pb.get("strategy_rules", [])
     if rules:
-        prompt += "\n--- YOUR STRATEGY RULES (learned from real results, FOLLOW THESE) ---\n"
-        for r in rules[-15:]:
-            prompt += f"- {r}\n"
+        prompt += "\nSTRATEGY RULES:\n"
+        for r in rules[-10:]:
+            prompt += f"- {r[:200]}\n"
 
     avoid_conditions = pb.get("avoid_conditions", [])
     if avoid_conditions:
-        prompt += "\n--- CONDITIONS TO AVOID (caused losses) ---\n"
-        for ac in avoid_conditions[-10:]:
-            prompt += f"- {ac}\n"
+        prompt += "\nAVOID:\n"
+        for ac in avoid_conditions[-5:]:
+            prompt += f"- {ac[:200]}\n"
 
     mistakes = pb.get("mistake_log", [])
     if mistakes:
-        prompt += "\n--- RECENT MISTAKES & LESSONS ---\n"
-        for m in mistakes[-5:]:
-            prompt += f"- [{m.get('date', '')}] {m.get('token', '')}: {m.get('lesson', '')}\n"
-
-    if pb.get("lessons"):
-        prompt += "\n--- YOUR LEARNED PLAYBOOK ---\n"
-        for lesson in pb["lessons"][-20:]:
-            prompt += f"- [{lesson.get('date', '')}] {lesson.get('note', '')}\n"
-
-    recent_tokens = pb.get("tokens_seen", [])[-50:]
-    if recent_tokens:
-        token_names = [t["name"] for t in recent_tokens]
-        repeats = {n: c for n, c in Counter(token_names).items() if c >= 2}
-        if repeats:
-            prompt += "\n--- REPEAT SIGHTINGS ---\n"
-            for name, count in sorted(repeats.items(), key=lambda x: x[1], reverse=True)[:10]:
-                prompt += f"- {name}: seen {count} times\n"
+        prompt += "\nRECENT MISTAKES:\n"
+        for m in mistakes[-3:]:
+            prompt += f"- {m.get('token', '')}: {m.get('lesson', '')[:150]}\n"
 
     pt_stats = pb.get("paper_trade_stats", {})
     if pt_stats.get("total_trades", 0) > 0:
         prompt += (
-            f"\n--- PAPER TRADE PERFORMANCE ---\n"
-            f"- Completed: {pt_stats['total_trades']}\n"
-            f"- Win rate: {pt_stats.get('win_rate', 0)}%\n"
-            f"- Avg return: {pt_stats.get('avg_return_pct', 0):+.1f}%\n"
-            f"USE THIS to validate whether your picks actually make money.\n"
+            f"\nPAPER TRADES: {pt_stats['total_trades']} done | "
+            f"{pt_stats.get('win_rate', 0)}% WR | Avg: {pt_stats.get('avg_return_pct', 0):+.1f}%\n"
         )
 
     prompt += f"""
-Scan #{pb.get('scans', 0) + 1}. You've been learning for {pb.get('scans', 0)} scans.
+Scan #{pb.get('scans', 0) + 1}.
 
 For EACH pick provide:
-
-PICK #[number]: [TOKEN NAME] ([SYMBOL])
+PICK #[n]: [NAME] ([SYMBOL])
 Contract: [address]
+RESEARCH: What data says, volume/buy analysis, MC trajectory, pattern match
+TRADE SETUP: Entry, Stop Loss (20-30% below), TP1 (~2x), TP2 (~3-5x), TP3 (~5-10x)
+Strategy / Risk Level / Confidence (1-10)
 
-DEEP RESEARCH:
-- What the data tells us (reference specific numbers)
-- Volume pattern analysis
-- Buy pressure analysis (retail or whales?)
-- Market cap trajectory - where could this realistically go?
-- How new is this token?
-- Does this match any of your WINNING or LOSING patterns?
-- Similarity score to past winners
+After all picks: WHALE WATCH, AVOID LIST, MARKET VIBE
 
-TRADE SETUP:
-Entry Price: $[specific price]
-Stop Loss: $[20-30% below entry]
-TP1 (Safe): $[~2x from entry]
-TP2 (Mid): $[~3-5x from entry]
-TP3 (Moon): $[~5-10x from entry]
-
-Strategy: [quick flip / swing / hold]
-Risk Level: LOW / MEDIUM / HIGH / DEGEN
-Time Outlook: [specific timeframe]
-Confidence: [1-10]
-
-After all picks:
-WHALE WATCH: Unusual whale activity
-AVOID LIST: Tokens that look like traps (explain WHY)
-MARKET VIBE: Overall Solana memecoin sentiment
-
-CRITICAL: End your response with a structured summary in ```json format:
+End with ```json summary:
 ```json
-{{
-  "lessons": ["specific lesson 1", "specific lesson 2"],
-  "rule_updates": {{
-    "add": ["new rule with data backing"],
-    "remove_keywords": ["keyword from a rule that should be removed"]
-  }},
-  "self_reflection": "Brief reflection on what you learned"
-}}
+{{"lessons": ["lesson1"], "rule_updates": {{"add": ["rule"], "remove_keywords": ["keyword"]}}, "self_reflection": "brief"}}
 ```
-
 Not financial advice."""
+
+    # Trim if too long
+    if len(prompt) > MAX_RESEARCH_PROMPT_CHARS:
+        prompt = prompt[:MAX_RESEARCH_PROMPT_CHARS] + "\n...(trimmed for length)"
+        log.warning(f"Research prompt trimmed to {MAX_RESEARCH_PROMPT_CHARS} chars")
 
     return prompt
 
@@ -1001,7 +949,8 @@ Not financial advice."""
 # AI CALLS (Groq)
 # ============================================================
 
-def call_groq(system: str, prompt: str, temperature: float = 0.8) -> Optional[str]:
+def call_groq(system: str, prompt: str, temperature: float = 0.8,
+              timeout: int = GROQ_TIMEOUT_STAGE1, max_tokens: int = GROQ_MAX_TOKENS_STAGE2) -> Optional[str]:
     """Call Groq API with the given system/user messages."""
     try:
         resp = requests.post(
@@ -1017,15 +966,18 @@ def call_groq(system: str, prompt: str, temperature: float = 0.8) -> Optional[st
                     {"role": "user", "content": prompt},
                 ],
                 "temperature": temperature,
-                "max_tokens": 4096,
+                "max_tokens": max_tokens,
             },
-            timeout=60,
+            timeout=timeout,
         )
         if resp.status_code != 200:
             log.error(f"Groq API error (HTTP {resp.status_code}): {resp.text[:300]}")
             return None
         result = resp.json()
         return result["choices"][0]["message"]["content"]
+    except requests.exceptions.Timeout:
+        log.error(f"Groq API timeout after {timeout}s")
+        return None
     except requests.exceptions.RequestException as e:
         log.error(f"Groq API request failed: {e}")
         return None
@@ -1296,27 +1248,25 @@ def evolve_strategy_rules(pb: dict) -> None:
 
     if wins:
         summary += f"\nWINNING TRADES ({len(wins)}):\n"
-        for w in wins[-10:]:
+        for w in wins[-8:]:
             summary += (
                 f"- {w['name']}: +{w['return_pct']}% | MC: ${w.get('entry_market_cap', 0):,.0f} "
                 f"({w.get('entry_mc_tier', '?')}) | Vol spike: {w.get('entry_vol_spike', 0)}x | "
-                f"Buy ratio: {w.get('entry_buy_ratio', 0)} | Age: {w.get('entry_age_hours', '?')}h | "
-                f"1h change at entry: {w.get('entry_price_change_1h', 0)}%\n"
+                f"Buy ratio: {w.get('entry_buy_ratio', 0)} | Age: {w.get('entry_age_hours', '?')}h\n"
             )
 
     if losses:
         summary += f"\nLOSING TRADES ({len(losses)}):\n"
-        for loss in losses[-10:]:
+        for loss in losses[-8:]:
             summary += (
                 f"- {loss['name']}: {loss['return_pct']}% | MC: ${loss.get('entry_market_cap', 0):,.0f} "
                 f"({loss.get('entry_mc_tier', '?')}) | Vol spike: {loss.get('entry_vol_spike', 0)}x | "
-                f"Buy ratio: {loss.get('entry_buy_ratio', 0)} | Age: {loss.get('entry_age_hours', '?')}h | "
-                f"1h change at entry: {loss.get('entry_price_change_1h', 0)}%\n"
+                f"Buy ratio: {loss.get('entry_buy_ratio', 0)} | Age: {loss.get('entry_age_hours', '?')}h\n"
             )
 
     if roi_tiers:
         summary += "\nROI BY CATEGORY:\n"
-        for name, data in sorted(roi_tiers.items(), key=lambda x: x[1]["avg_roi"], reverse=True):
+        for name, data in sorted(roi_tiers.items(), key=lambda x: x[1]["avg_roi"], reverse=True)[:8]:
             summary += f"- {name}: avg ROI {data['avg_roi']:+.1f}%, win rate {data['win_rate']}% ({data['count']} trades)\n"
 
     existing_text = "\n".join(f"{i + 1}. {r}" for i, r in enumerate(existing_rules)) if existing_rules else "(none yet)"
@@ -1342,7 +1292,7 @@ Total rules should be 5-10. Each must be specific, actionable, and data-backed."
 
     user_prompt = f"EXISTING RULES:\n{existing_text}\n\nTRADE DATA:\n{summary}"
 
-    result = call_groq(system, user_prompt, temperature=0.3)
+    result = call_groq(system, user_prompt, temperature=0.3, timeout=GROQ_TIMEOUT_RULES)
     if not result:
         return
 
@@ -1767,12 +1717,28 @@ def close_paper_trade(pb: dict, trade: dict, exit_price: float, reason: str) -> 
 
     # ---- LIVE TRADING: Execute real sell ----
     if TRADER_AVAILABLE and is_live_trading_enabled() and trade.get("live_trade", {}).get("success"):
-        sell_result = sell_token(trade["contract"])
-        closed_record["live_sell"] = sell_result
-        if sell_result["success"]:
-            log.info(f"LIVE SELL: {trade['token_name']} | tx: {sell_result['signature']}")
-        else:
-            log.warning(f"LIVE SELL FAILED: {trade['token_name']} | {sell_result['error']}")
+        send_msg(
+            f"\U0001f4b1 LIVE SELL ATTEMPT: {trade['token_name']} ({trade['symbol']})\n"
+            f"Reason: {reason}"
+        )
+        try:
+            sell_result = sell_token(trade["contract"])
+            closed_record["live_sell"] = sell_result
+            if sell_result["success"]:
+                send_msg(
+                    f"\u2705 LIVE SELL SUCCESS: {trade['token_name']}\n"
+                    f"tx: {sell_result['signature']}"
+                )
+                log.info(f"LIVE SELL: {trade['token_name']} | tx: {sell_result['signature']}")
+            else:
+                send_msg(
+                    f"\u274c LIVE SELL FAILED: {trade['token_name']}\n"
+                    f"Error: {sell_result['error']}"
+                )
+                log.warning(f"LIVE SELL FAILED: {trade['token_name']} | {sell_result['error']}")
+        except Exception as e:
+            send_msg(f"\u274c LIVE SELL CRASH: {trade['token_name']}\nException: {str(e)[:300]}")
+            log.error(f"LIVE SELL EXCEPTION: {trade['token_name']} | {e}")
 
     pb.setdefault("paper_trade_history", []).append(closed_record)
     pb["paper_trade_history"] = pb["paper_trade_history"][-TRIM["paper_trade_history"]:]
@@ -2116,12 +2082,40 @@ def confirm_pending_trades(pb: dict) -> tuple[list, list]:
             # ---- LIVE TRADING: Execute real buy ----
             if TRADER_AVAILABLE and is_live_trading_enabled():
                 max_sol = float(os.environ.get("MAX_SOL_PER_TRADE", "0.03"))
-                buy_result = buy_token(contract, max_sol)
-                trade["live_trade"] = buy_result
-                if buy_result["success"]:
-                    log.info(f"LIVE BUY: {trade['token_name']} | tx: {buy_result['signature']}")
-                else:
-                    log.warning(f"LIVE BUY FAILED: {trade['token_name']} | {buy_result['error']}")
+                send_msg(
+                    f"\U0001f6a8 LIVE BUY ATTEMPT\n"
+                    f"Token: {trade['token_name']} ({trade['symbol']})\n"
+                    f"Contract: {contract[:20]}...\n"
+                    f"Amount: {max_sol} SOL\n"
+                    f"Price: ${current_price:.10g}"
+                )
+                try:
+                    buy_result = buy_token(contract, max_sol)
+                    trade["live_trade"] = buy_result
+                    if buy_result["success"]:
+                        send_msg(
+                            f"\u2705 LIVE BUY SUCCESS!\n"
+                            f"{trade['token_name']} ({trade['symbol']})\n"
+                            f"tx: {buy_result['signature']}\n"
+                            f"https://solscan.io/tx/{buy_result['signature']}"
+                        )
+                        log.info(f"LIVE BUY: {trade['token_name']} | tx: {buy_result['signature']}")
+                    else:
+                        send_msg(
+                            f"\u274c LIVE BUY FAILED!\n"
+                            f"{trade['token_name']} ({trade['symbol']})\n"
+                            f"Error: {buy_result['error']}"
+                        )
+                        log.warning(f"LIVE BUY FAILED: {trade['token_name']} | {buy_result['error']}")
+                except Exception as e:
+                    error_msg = str(e)[:300]
+                    send_msg(
+                        f"\u274c LIVE BUY CRASH!\n"
+                        f"{trade['token_name']} ({trade['symbol']})\n"
+                        f"Exception: {error_msg}"
+                    )
+                    log.error(f"LIVE BUY EXCEPTION: {trade['token_name']} | {e}")
+                    trade["live_trade"] = {"success": False, "signature": None, "error": error_msg}
 
     pb["pending_paper_trades"] = []
     pb["paper_trades"] = open_trades
@@ -2340,7 +2334,7 @@ def handle_user_messages(pb: dict) -> None:
             f"{context}"
         )
 
-        reply = call_groq(system, sanitized_text, temperature=0.6)
+        reply = call_groq(system, sanitized_text, temperature=0.6, timeout=30)
         if reply:
             send_msg(f"\U0001f4ac {reply[:TELEGRAM_MSG_LIMIT]}")
             replies_sent += 1
@@ -2382,12 +2376,20 @@ def main() -> None:
     # ---- Wallet status ----
     wallet_info = ""
     if TRADER_AVAILABLE:
-        ws = get_wallet_summary()
-        if "error" not in ws:
-            mode = "LIVE" if ws["live_trading"] else "PAPER"
-            wallet_info = f"\n\U0001f4b0 Wallet: {ws['balance_sol']} SOL | Mode: {mode} | Max: {ws['max_per_trade']} SOL/trade"
-        else:
-            wallet_info = f"\n\U0001f4b0 Wallet: error - {ws['error']}"
+        try:
+            ws = get_wallet_summary()
+            if "error" not in ws:
+                mode = "LIVE" if ws["live_trading"] else "PAPER"
+                wallet_info = f"\n\U0001f4b0 Wallet: {ws['balance_sol']} SOL | Mode: {mode} | Max: {ws['max_per_trade']} SOL/trade"
+            else:
+                wallet_info = f"\n\U0001f4b0 Wallet: error - {ws['error']}"
+        except Exception as e:
+            wallet_info = f"\n\U0001f4b0 Wallet: exception - {str(e)[:100]}"
+
+    # ---- RPC health check ----
+    rpc_url = os.environ.get("SOLANA_RPC_URL", "")
+    if not rpc_url:
+        wallet_info += "\n\u26a0\ufe0f WARNING: SOLANA_RPC_URL is empty! Using public RPC (unreliable for trading)"
 
     send_msg(
         f"\U0001f50d Scan #{scan_num}\n"
@@ -2443,7 +2445,10 @@ def main() -> None:
 
     # ---- STEP 3: Stage 1 - Quick scan ----
     scan_prompt = build_scan_prompt(playbook)
-    stage1_result = call_groq(scan_prompt, f"Analyze:\n\n{token_data}", temperature=0.5)
+    stage1_result = call_groq(
+        scan_prompt, f"Analyze:\n\n{token_data}",
+        temperature=0.5, timeout=GROQ_TIMEOUT_STAGE1, max_tokens=GROQ_MAX_TOKENS_STAGE1,
+    )
 
     if not stage1_result:
         send_msg("\u26a0\ufe0f Stage 1 failed. Next cycle.")
@@ -2466,16 +2471,34 @@ def main() -> None:
         send_msg("\U0001f3af Picks found. Stage 2...")
 
     # ---- STEP 4: Stage 2 - Deep research ----
+    # Only include data for picked tokens to reduce prompt size
+    picked_contracts = set()
+    if picks and isinstance(picks, list):
+        picked_contracts = {p.get("contract", "") for p in picks if p.get("contract")}
+
+    if picked_contracts:
+        filtered_tokens = [
+            t for t in tokens
+            if any(c in t for c in picked_contracts)
+        ]
+        if not filtered_tokens:
+            filtered_tokens = tokens[:3]
+    else:
+        filtered_tokens = tokens[:3]
+
+    filtered_token_data = "\n\n---\n\n".join(filtered_tokens)
+
     research_prompt = build_research_prompt(playbook)
     deep_prompt = (
         f"Top picks:\n{picks_summary}\n\n"
-        f"Full token data:\n\n{token_data}\n\n"
-        f"Do DEEP RESEARCH on each pick. Reference your real track record, "
-        f"strategy rules, and trade memory. Flag any picks that match your "
-        f"losing patterns or avoid conditions."
+        f"Token data for picks:\n\n{filtered_token_data}\n\n"
+        f"Do DEEP RESEARCH on each pick. Reference your real track record and strategy rules."
     )
 
-    research = call_groq(research_prompt, deep_prompt, temperature=0.85)
+    research = call_groq(
+        research_prompt, deep_prompt,
+        temperature=0.85, timeout=GROQ_TIMEOUT_STAGE2, max_tokens=GROQ_MAX_TOKENS_STAGE2,
+    )
 
     if research:
         extract_stage2_lessons(research, playbook)
