@@ -1766,7 +1766,7 @@ def close_paper_trade(pb: dict, trade: dict, exit_price: float, reason: str) -> 
         blacklist_token(pb, trade["contract"], trade["token_name"], f"Paper trade lost {return_pct:.1f}%")
 
     # ---- LIVE TRADING: Execute real sell ----
-    if TRADER_AVAILABLE and is_live_trading_enabled():
+    if TRADER_AVAILABLE and is_live_trading_enabled() and trade.get("live_trade", {}).get("success"):
         sell_result = sell_token(trade["contract"])
         closed_record["live_sell"] = sell_result
         if sell_result["success"]:
