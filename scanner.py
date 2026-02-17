@@ -26,8 +26,9 @@ from typing import Any, Optional
 try:
     from trader import buy_token, sell_token, get_wallet_summary, is_live_trading_enabled
     TRADER_AVAILABLE = True
-except ImportError:
+except Exception as _trader_import_err:
     TRADER_AVAILABLE = False
+    _TRADER_IMPORT_ERROR = str(_trader_import_err)
 
 
 # ============================================================
@@ -63,7 +64,7 @@ API_TIMEOUT = 10                      # Default API timeout in seconds
 GROQ_TIMEOUT_STAGE1 = 60              # Timeout for Stage 1 (short prompt)
 GROQ_TIMEOUT_STAGE2 = 120             # Timeout for Stage 2 (long prompt)
 GROQ_TIMEOUT_RULES = 90               # Timeout for rule evolution
-GROQ_MAX_TOKENS_STAGE1 = 2048         # Max output tokens for Stage 1
+GROQ_MAX_TOKENS_STAGE1 = 4096         # Max output tokens for Stage 1 (needs room for 12 token scores)
 GROQ_MAX_TOKENS_STAGE2 = 4096         # Max output tokens for Stage 2
 
 # -- Telegram --
@@ -144,7 +145,7 @@ logging.basicConfig(
 log = logging.getLogger("scanner")
 
 if not TRADER_AVAILABLE:
-    log.warning("trader.py not found - live trading unavailable")
+    log.warning(f"trader.py import failed - live trading unavailable: {_TRADER_IMPORT_ERROR}")
 
 
 # ============================================================
@@ -2385,6 +2386,9 @@ def main() -> None:
                 wallet_info = f"\n\U0001f4b0 Wallet: error - {ws['error']}"
         except Exception as e:
             wallet_info = f"\n\U0001f4b0 Wallet: exception - {str(e)[:100]}"
+
+    if not TRADER_AVAILABLE:
+        wallet_info = f"\n\u274c TRADER OFFLINE: {_TRADER_IMPORT_ERROR}"
 
     # ---- RPC health check ----
     rpc_url = os.environ.get("SOLANA_RPC_URL", "")
