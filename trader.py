@@ -1,264 +1,411 @@
 """
-trader.py - Solana Trading Module for Memecoinsnipa
+trader.py - Solana Trading Module (Jupiter v6) for Memecoinsnipa
 
-Uses Jupiter Swap API (swap/v1) for token swaps on Solana.
-Handles buy/sell with safety controls.
+Purpose:
+- Execute REAL buys/sells on Solana via Jupiter.
+- Provide wallet status for the scanner.
+- Match the scanner.py expectations:
+    * buy_token(mint, sol_amount) -> {"success": bool, "signature": str|None, "error": str|None}
+    * sell_token(mint)            -> {"success": bool, "signature": str|None, "error": str|None}
+    * get_wallet_summary()        -> {"balance_sol": float, "pubkey": str, "live_trading": bool, "max_per_trade": float} OR {"error": "..."}
+    * is_live_trading_enabled()   -> bool
 
-This version fixes:
-- Missing exports expected by scanner.py: get_wallet_summary(), is_live_trading_enabled()
-- Response schema: returns {"success": bool, "signature": str|None, "error": str|None, ...}
-- Jupiter endpoint updates (swap/v1) and proper swap payload so swapTransaction is returned
-- sell_token() now works with scanner.py calling sell_token(mint) (sells 100% by default)
+Key fixes (vs common broken versions):
+- Uses CURRENT Jupiter endpoints:
+    https://quote-api.jup.ag/v6/quote
+    https://quote-api.jup.ag/v6/swap
+  (Old endpoints like https://api.jup.ag/swap/v1/quote may return 401 now.)
+- Passes a SINGLE selected route object to /swap (quote["data"][0]) — not the whole quote payload.
+  This prevents: "No swapTransaction returned".
+- Sell function auto-detects your token balance and sells 100% by default.
 """
+
+from __future__ import annotations
 
 import os
 import time
 import json
 import base64
 import logging
-import requests
-import base58
 from typing import Any, Dict, Optional, Tuple
 
+import requests
 from solders.keypair import Keypair
+from solders.pubkey import Pubkey
 from solders.transaction import VersionedTransaction
 
 log = logging.getLogger("trader")
 
-# ============================================================
-# CONSTANTS
-# ============================================================
+# =========================
+# Constants / Config
+# =========================
 
 LAMPORTS_PER_SOL = 1_000_000_000
 SOL_MINT = "So11111111111111111111111111111111111111112"
 
-# Jupiter Swap API v1 (current)
-JUPITER_QUOTE_URL = "https://api.jup.ag/swap/v1/quote"
-JUPITER_SWAP_URL = "https://api.jup.ag/swap/v1/swap"
+# CURRENT Jupiter v6 endpoints
+JUPITER_QUOTE_URL = "https://quote-api.jup.ag/v6/quote"
+JUPITER_SWAP_URL  = "https://quote-api.jup.ag/v6/swap"
 
-# Defaults / safety
-DEFAULT_SLIPPAGE_BPS = 2500  # 25%
-MAX_RETRIES = 3
-CONFIRM_TIMEOUT = 60
-MIN_SOL_RESERVE = 0.01  # keep some SOL for fees
+DEFAULT_SLIPPAGE_BPS = int(os.environ.get("DEFAULT_SLIPPAGE_BPS", "2500"))  # 25%
+MAX_RETRIES = int(os.environ.get("MAX_RETRIES", "3"))
+CONFIRM_TIMEOUT = int(os.environ.get("CONFIRM_TIMEOUT", "60"))
+
+# Preflight ON by default (safer; fewer "ghost tx" situations)
+SKIP_PREFLIGHT = os.environ.get("SKIP_PREFLIGHT", "false").lower() == "true"
+PREFLIGHT_COMMITMENT = os.environ.get("PREFLIGHT_COMMITMENT", "processed")
+CONFIRM_COMMITMENT = os.environ.get("CONFIRM_COMMITMENT", "confirmed")
+
+# Optional priority fee (0 disables)
+PRIORITY_FEE_LAMPORTS = int(os.environ.get("PRIORITY_FEE_LAMPORTS", "0"))
+
+# Keep some SOL so you never hard-brick yourself
+MIN_SOL_RESERVE = float(os.environ.get("MIN_SOL_RESERVE", "0.01"))
+
+# Scanner uses this env var for sizing trades
+MAX_SOL_PER_TRADE_DEFAULT = float(os.environ.get("MAX_SOL_PER_TRADE", "0.03"))
 
 # RPC
-RPC_URL = os.environ.get("SOLANA_RPC_URL", "").strip() or "https://api.mainnet-beta.solana.com"
+DEFAULT_PUBLIC_RPC = "https://api.mainnet-beta.solana.com"
+RPC_TIMEOUT = int(os.environ.get("RPC_TIMEOUT", "30"))
 
-# Wallet / env flags
-PRIVATE_KEY_B58 = os.environ.get("WALLET_PRIVATE_KEY_BASE58", "").strip()
-LIVE_TRADING_ENABLED = os.environ.get("LIVE_TRADING_ENABLED", "false").strip().lower() in ("1", "true", "yes", "y")
-MAX_SOL_PER_TRADE = float(os.environ.get("MAX_SOL_PER_TRADE", "0.03"))
 
-# ============================================================
-# RPC HELPERS
-# ============================================================
+# =========================
+# Env / Feature flags
+# =========================
 
-def _rpc(method: str, params: list) -> Dict[str, Any]:
-    r = requests.post(
-        RPC_URL,
-        json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
-        timeout=20,
-    )
+def is_live_trading_enabled() -> bool:
+    """
+    Scanner gates real trades on this.
+    Accepts: "true/1/yes/on" (case-insensitive).
+    """
+    v = (os.environ.get("LIVE_TRADING_ENABLED", "") or os.environ.get("LIVE_TRADING", "")).strip().lower()
+    return v in ("1", "true", "yes", "y", "on")
+
+
+# =========================
+# RPC helpers
+# =========================
+
+def _rpc_url() -> str:
+    # Allow scanner.py to run even if user forgot SOLANA_RPC_URL.
+    # But warn: public RPC can be flaky for trading.
+    url = os.environ.get("SOLANA_RPC_URL", "").strip()
+    return url or DEFAULT_PUBLIC_RPC
+
+def _rpc(method: str, params: list) -> Any:
+    payload = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}
+    r = requests.post(_rpc_url(), json=payload, timeout=RPC_TIMEOUT)
     r.raise_for_status()
     data = r.json()
     if "error" in data:
-        raise RuntimeError(data["error"])
+        raise RuntimeError(f"RPC error: {data['error']}")
     return data["result"]
 
-def _get_sol_balance(pubkey: str) -> float:
-    res = _rpc("getBalance", [pubkey, {"commitment": "confirmed"}])
-    lamports = int(res.get("value", 0))
-    return lamports / LAMPORTS_PER_SOL
+def _sol_balance(pubkey_str: str) -> float:
+    res = _rpc("getBalance", [pubkey_str, {"commitment": "processed"}])
+    return float(res["value"]) / LAMPORTS_PER_SOL
 
-def _get_token_account_for_mint(owner: str, mint: str) -> Optional[str]:
-    # Use jsonParsed to easily read mint + amounts
-    res = _rpc(
-        "getTokenAccountsByOwner",
-        [owner, {"mint": mint}, {"encoding": "jsonParsed", "commitment": "confirmed"}],
-    )
-    value = res.get("value", [])
-    if not value:
-        return None
-    # choose the first account (should be ATA); if multiple, pick the one with largest balance
-    best = None
-    best_amt = -1
-    for acc in value:
+
+# =========================
+# Wallet loading
+# =========================
+
+def _load_wallet() -> Keypair:
+    """
+    Supports multiple env var names (so you don't have to rename things again):
+
+    Preferred (base58 64-byte secret key):
+      - WALLET_PRIVATE_KEY_BASE58   (what scanner.py expects)
+      - SOLANA_PRIVATE_KEY_B58
+      - SOLANA_PRIVATE_KEY_BASE58
+
+    Also supports JSON array of ints (Phantom export style sometimes):
+      - SOLANA_PRIVATE_KEY          (e.g. "[12,34,...]")
+    """
+    # Base58 variants
+    b58 = (
+        os.environ.get("WALLET_PRIVATE_KEY_BASE58", "")
+        or os.environ.get("SOLANA_PRIVATE_KEY_B58", "")
+        or os.environ.get("SOLANA_PRIVATE_KEY_BASE58", "")
+    ).strip()
+
+    if b58:
         try:
-            info = acc["account"]["data"]["parsed"]["info"]
-            amt = int(info["tokenAmount"]["amount"])
-            if amt > best_amt:
-                best_amt = amt
-                best = acc["pubkey"]
-        except Exception:
-            continue
-    return best
+            import base58
+            secret = base58.b58decode(b58)
+            kp = Keypair.from_bytes(secret)
+            log.info(f"Wallet loaded: {kp.pubkey()}")
+            return kp
+        except Exception as e:
+            raise RuntimeError(f"Failed to load base58 key: {e}")
 
-def _get_token_balance_raw(owner: str, mint: str) -> Tuple[int, int]:
-    token_acc = _get_token_account_for_mint(owner, mint)
-    if not token_acc:
-        return 0, 0
-    bal = _rpc("getTokenAccountBalance", [token_acc, {"commitment": "confirmed"}])
-    val = bal.get("value", {})
-    amount = int(val.get("amount", "0"))
-    decimals = int(val.get("decimals", 0))
-    return amount, decimals
+    # JSON array variant
+    raw = os.environ.get("SOLANA_PRIVATE_KEY", "").strip()
+    if raw:
+        try:
+            arr = json.loads(raw)
+            secret = bytes(arr)
+            kp = Keypair.from_bytes(secret)
+            log.info(f"Wallet loaded: {kp.pubkey()}")
+            return kp
+        except Exception as e:
+            raise RuntimeError(f"Failed to load JSON key array: {e}")
 
-# ============================================================
-# KEYPAIR / TX HELPERS
-# ============================================================
+    raise RuntimeError("WALLET_PRIVATE_KEY_BASE58 env var is missing (or SOLANA_PRIVATE_KEY_B58 / SOLANA_PRIVATE_KEY_BASE58 / SOLANA_PRIVATE_KEY)")
 
-def _load_keypair() -> Keypair:
-    if not PRIVATE_KEY_B58:
-        raise RuntimeError("WALLET_PRIVATE_KEY_BASE58 env var is missing")
-    try:
-        secret = base58.b58decode(PRIVATE_KEY_B58)
-        return Keypair.from_bytes(secret)
-    except Exception as e:
-        raise RuntimeError(f"Failed to load wallet private key: {e}")
 
-def _send_and_confirm_raw_tx(b64_tx: str, timeout_s: int = CONFIRM_TIMEOUT) -> str:
-    # Send
-    sig = _rpc("sendTransaction", [b64_tx, {"encoding": "base64", "skipPreflight": False, "maxRetries": 3}])
-    if not isinstance(sig, str):
-        raise RuntimeError(f"Unexpected sendTransaction result: {sig}")
+# =========================
+# Jupiter helpers
+# =========================
 
-    # Confirm
-    start = time.time()
-    while time.time() - start < timeout_s:
-        st = _rpc("getSignatureStatuses", [[sig], {"searchTransactionHistory": True}])
-        v = (st.get("value") or [None])[0]
-        if v and v.get("confirmationStatus") in ("confirmed", "finalized"):
-            err = v.get("err")
-            if err:
-                raise RuntimeError(f"Transaction failed: {err}")
-            return sig
-        time.sleep(1.5)
+def _http_get(url: str, params: dict, timeout: int = 30) -> dict:
+    r = requests.get(url, params=params, timeout=timeout)
+    r.raise_for_status()
+    return r.json()
 
-    raise RuntimeError(f"Timed out confirming tx {sig}")
+def _http_post(url: str, body: dict, timeout: int = 30) -> dict:
+    r = requests.post(url, json=body, timeout=timeout)
+    r.raise_for_status()
+    return r.json()
 
-# ============================================================
-# JUPITER HELPERS
-# ============================================================
-
-def _jup_quote(input_mint: str, output_mint: str, amount: int, slippage_bps: int) -> Dict[str, Any]:
-    # amount is integer raw units (lamports for SOL; base units for SPL token)
+def _get_quote_route(input_mint: str, output_mint: str, amount: int, slippage_bps: int) -> dict:
+    """
+    Returns a SINGLE selected route object (quote['data'][0]).
+    Passing the whole quote payload to /swap is a common bug.
+    """
     params = {
         "inputMint": input_mint,
         "outputMint": output_mint,
-        "amount": str(int(amount)),
-        "slippageBps": str(int(slippage_bps)),
+        "amount": str(amount),
+        "slippageBps": str(slippage_bps),
+        "onlyDirectRoutes": "false",
     }
-    r = requests.get(JUPITER_QUOTE_URL, params=params, timeout=20)
-    r.raise_for_status()
-    data = r.json()
-    # On v1, quote returns an object (not a list) containing routePlan, outAmount, etc.
-    if not isinstance(data, dict) or not data.get("routePlan"):
-        # Sometimes Jupiter returns {"error": "..."}
-        raise RuntimeError(data.get("error", "Quote returned no routePlan"))
-    return data
+    quote = _http_get(JUPITER_QUOTE_URL, params=params, timeout=30)
 
-def _jup_swap_tx(quote_response: Dict[str, Any], user_pubkey: str) -> str:
-    payload = {
-        "quoteResponse": quote_response,
+    routes = quote.get("data") if isinstance(quote, dict) else None
+    if not routes:
+        raise RuntimeError(f"Jupiter quote returned no routes: {str(quote)[:300]}")
+    return routes[0]
+
+def _get_swap_tx(route: dict, user_pubkey: str) -> str:
+    """
+    Returns base64 swapTransaction string.
+    """
+    body: Dict[str, Any] = {
+        "quoteResponse": route,        # IMPORTANT: one route object
         "userPublicKey": user_pubkey,
         "wrapAndUnwrapSol": True,
         "dynamicComputeUnitLimit": True,
-        # Priority fee helps memecoins, but keep conservative unless user sets env
-        "prioritizationFeeLamports": int(os.environ.get("PRIORITY_FEE_LAMPORTS", "0") or 0),
     }
-    r = requests.post(JUPITER_SWAP_URL, json=payload, timeout=30)
-    r.raise_for_status()
-    data = r.json()
+    if PRIORITY_FEE_LAMPORTS > 0:
+        body["prioritizationFeeLamports"] = PRIORITY_FEE_LAMPORTS
+
+    data = _http_post(JUPITER_SWAP_URL, body=body, timeout=30)
     swap_tx = data.get("swapTransaction")
     if not swap_tx:
-        raise RuntimeError(data.get("error", "No swapTransaction returned"))
+        # Provide a tight error message for Telegram
+        raise RuntimeError(f"No swapTransaction returned. Keys={list(data.keys())} body_error={str(data)[:250]}")
     return swap_tx
 
-# ============================================================
-# PUBLIC API (scanner.py expects these)
-# ============================================================
+def _send_raw_tx(b64_tx: str) -> str:
+    cfg = {
+        "encoding": "base64",
+        "skipPreflight": SKIP_PREFLIGHT,
+        "preflightCommitment": PREFLIGHT_COMMITMENT,
+        "maxRetries": 3,
+    }
+    return _rpc("sendTransaction", [b64_tx, cfg])
 
-def is_live_trading_enabled() -> bool:
-    return bool(LIVE_TRADING_ENABLED)
+def _confirm_sig(sig: str, timeout_s: int) -> bool:
+    start = time.time()
+    while time.time() - start < timeout_s:
+        try:
+            st = _rpc("getSignatureStatuses", [[sig], {"searchTransactionHistory": True}])
+            val = st["value"][0]
+            if val is None:
+                time.sleep(2)
+                continue
 
-def get_wallet_summary() -> Dict[str, Any]:
-    """Return wallet + mode info for scanner status line."""
+            if val.get("err") is not None:
+                log.warning(f"Tx {sig} failed: {val.get('err')}")
+                return False
+
+            conf = val.get("confirmationStatus")
+            if conf in ("confirmed", "finalized"):
+                return True
+
+            time.sleep(2)
+        except Exception as e:
+            log.warning(f"Confirm status error for {sig}: {e}")
+            time.sleep(2)
+
+    # last chance
     try:
-        kp = _load_keypair()
-        pub = str(kp.pubkey())
-        bal = _get_sol_balance(pub)
+        tx = _rpc("getTransaction", [sig, {"encoding": "jsonParsed", "commitment": CONFIRM_COMMITMENT}])
+        return bool(tx)
+    except Exception:
+        return False
+
+
+# =========================
+# Token balance helpers (for sells)
+# =========================
+
+def _get_token_balance_raw(owner_pubkey: str, mint: str) -> Tuple[int, int]:
+    """
+    Returns (amount_raw, decimals) aggregated across token accounts.
+    """
+    res = _rpc(
+        "getTokenAccountsByOwner",
+        [
+            owner_pubkey,
+            {"mint": mint},
+            {"encoding": "jsonParsed", "commitment": "processed"},
+        ],
+    )
+
+    amount_raw = 0
+    decimals = 0
+    for item in res.get("value", []):
+        info = (
+            item.get("account", {})
+            .get("data", {})
+            .get("parsed", {})
+            .get("info", {})
+        )
+        ta = info.get("tokenAmount", {})
+        amt_str = ta.get("amount", "0")
+        dec = ta.get("decimals", 0)
+        try:
+            amount_raw += int(amt_str)
+            decimals = int(dec)
+        except Exception:
+            continue
+
+    return amount_raw, decimals
+
+
+# =========================
+# Public API expected by scanner.py
+# =========================
+
+def get_wallet_summary() -> dict:
+    """
+    Used by scanner.py to print wallet + mode.
+    """
+    try:
+        kp = _load_wallet()
+        pubkey = str(kp.pubkey())
+        bal = _sol_balance(pubkey)
         return {
+            "pubkey": pubkey,
             "balance_sol": round(bal, 6),
             "live_trading": is_live_trading_enabled(),
-            "max_per_trade": float(os.environ.get("MAX_SOL_PER_TRADE", str(MAX_SOL_PER_TRADE))),
-            "rpc_url": RPC_URL,
+            "max_per_trade": float(os.environ.get("MAX_SOL_PER_TRADE", str(MAX_SOL_PER_TRADE_DEFAULT))),
+            "rpc": _rpc_url(),
         }
     except Exception as e:
-        return {"error": str(e)[:300]}
+        return {"error": str(e)}
 
-def buy_token(token_mint: str, sol_amount: float, slippage_bps: int = DEFAULT_SLIPPAGE_BPS) -> Dict[str, Any]:
-    """
-    Swap SOL -> token_mint using Jupiter.
-    Returns: {"success": bool, "signature": str|None, "error": str|None, "details": {...}}
-    """
-    if not is_live_trading_enabled():
-        return {"success": False, "signature": None, "error": "LIVE_TRADING_ENABLED is false", "details": {}}
 
+def buy_token(output_mint: str, sol_amount: float, slippage_bps: int = DEFAULT_SLIPPAGE_BPS) -> dict:
+    """
+    Buy `output_mint` spending `sol_amount` SOL.
+
+    Returns:
+      {"success": bool, "signature": str|None, "error": str|None}
+    """
     try:
-        kp = _load_keypair()
-        user_pub = str(kp.pubkey())
+        kp = _load_wallet()
+        user_pubkey = str(kp.pubkey())
 
-        sol_balance = _get_sol_balance(user_pub)
-        if sol_balance - MIN_SOL_RESERVE <= 0:
-            return {"success": False, "signature": None, "error": "Insufficient SOL for fees", "details": {"balance_sol": sol_balance}}
+        bal = _sol_balance(user_pubkey)
+        if bal - sol_amount < MIN_SOL_RESERVE:
+            return {
+                "success": False,
+                "signature": None,
+                "error": f"Not enough SOL. Balance={bal:.4f}, requested={sol_amount:.4f}, reserve={MIN_SOL_RESERVE:.4f}",
+            }
 
-        spend = min(sol_amount, max(sol_balance - MIN_SOL_RESERVE, 0))
-        if spend <= 0:
-            return {"success": False, "signature": None, "error": "Spend amount too small after reserve", "details": {"balance_sol": sol_balance}}
+        lamports_in = int(sol_amount * LAMPORTS_PER_SOL)
+        last_err: Optional[str] = None
 
-        amount_lamports = int(spend * LAMPORTS_PER_SOL)
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                route = _get_quote_route(SOL_MINT, output_mint, lamports_in, slippage_bps)
+                swap_tx_b64 = _get_swap_tx(route, user_pubkey)
 
-        quote = _jup_quote(SOL_MINT, token_mint, amount_lamports, slippage_bps)
-        swap_tx_b64 = _jup_swap_tx(quote, user_pub)
+                raw = base64.b64decode(swap_tx_b64)
+                vtx = VersionedTransaction.from_bytes(raw)
 
-        # Sign tx
-        tx = VersionedTransaction.from_bytes(base64.b64decode(swap_tx_b64))
-        signed = VersionedTransaction(tx.message, [kp])
-        sig = _send_and_confirm_raw_tx(base64.b64encode(bytes(signed)).decode("utf-8"))
+                signed = VersionedTransaction(vtx.message, [kp])
+                signed_b64 = base64.b64encode(bytes(signed)).decode("utf-8")
 
-        return {"success": True, "signature": sig, "error": None, "details": {"spent_sol": spend, "slippage_bps": slippage_bps}}
+                sig = _send_raw_tx(signed_b64)
+                log.info(f"BUY sent: {sig} (attempt {attempt}/{MAX_RETRIES})")
+
+                if _confirm_sig(sig, CONFIRM_TIMEOUT):
+                    return {"success": True, "signature": sig, "error": None}
+
+                last_err = f"Sent but not confirmed after {CONFIRM_TIMEOUT}s (sig={sig})"
+                time.sleep(2 + attempt)
+            except requests.exceptions.HTTPError as he:
+                # Tighten HTTP errors for Telegram (e.g. 401 from old endpoints)
+                last_err = f"HTTP error: {str(he)[:200]}"
+                time.sleep(2 + attempt)
+            except Exception as e:
+                last_err = str(e)[:400]
+                time.sleep(2 + attempt)
+
+        return {"success": False, "signature": None, "error": last_err or "Unknown error"}
+
     except Exception as e:
-        return {"success": False, "signature": None, "error": str(e)[:300], "details": {}}
+        return {"success": False, "signature": None, "error": str(e)[:400]}
 
-def sell_token(token_mint: str, pct: float = 1.0, slippage_bps: int = DEFAULT_SLIPPAGE_BPS) -> Dict[str, Any]:
-    """
-    Swap token_mint -> SOL using Jupiter.
-    Default pct=1.0 sells 100% of the token balance (scanner calls sell_token(mint) with 1 arg).
-    """
-    if not is_live_trading_enabled():
-        return {"success": False, "signature": None, "error": "LIVE_TRADING_ENABLED is false", "details": {}}
 
+def sell_token(input_mint: str, slippage_bps: int = DEFAULT_SLIPPAGE_BPS) -> dict:
+    """
+    Sell 100% of your balance of `input_mint` into SOL.
+
+    Returns:
+      {"success": bool, "signature": str|None, "error": str|None}
+    """
     try:
-        kp = _load_keypair()
-        user_pub = str(kp.pubkey())
+        kp = _load_wallet()
+        user_pubkey = str(kp.pubkey())
 
-        raw_amt, decimals = _get_token_balance_raw(user_pub, token_mint)
-        if raw_amt <= 0:
-            return {"success": False, "signature": None, "error": "No token balance to sell", "details": {"decimals": decimals}}
+        amount_raw, decimals = _get_token_balance_raw(user_pubkey, input_mint)
+        if amount_raw <= 0:
+            return {"success": False, "signature": None, "error": f"No token balance found for mint {input_mint}"}
 
-        pct = max(0.0, min(float(pct), 1.0))
-        sell_amt = int(raw_amt * pct)
-        if sell_amt <= 0:
-            return {"success": False, "signature": None, "error": "Sell amount rounds to 0", "details": {"raw_amt": raw_amt, "pct": pct}}
+        last_err: Optional[str] = None
 
-        quote = _jup_quote(token_mint, SOL_MINT, sell_amt, slippage_bps)
-        swap_tx_b64 = _jup_swap_tx(quote, user_pub)
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                route = _get_quote_route(input_mint, SOL_MINT, amount_raw, slippage_bps)
+                swap_tx_b64 = _get_swap_tx(route, user_pubkey)
 
-        tx = VersionedTransaction.from_bytes(base64.b64decode(swap_tx_b64))
-        signed = VersionedTransaction(tx.message, [kp])
-        sig = _send_and_confirm_raw_tx(base64.b64encode(bytes(signed)).decode("utf-8"))
+                raw = base64.b64decode(swap_tx_b64)
+                vtx = VersionedTransaction.from_bytes(raw)
 
-        return {"success": True, "signature": sig, "error": None, "details": {"sold_pct": pct, "sold_raw": sell_amt, "decimals": decimals}}
+                signed = VersionedTransaction(vtx.message, [kp])
+                signed_b64 = base64.b64encode(bytes(signed)).decode("utf-8")
+
+                sig = _send_raw_tx(signed_b64)
+                log.info(f"SELL sent: {sig} (attempt {attempt}/{MAX_RETRIES})")
+
+                if _confirm_sig(sig, CONFIRM_TIMEOUT):
+                    return {"success": True, "signature": sig, "error": None}
+
+                last_err = f"Sent but not confirmed after {CONFIRM_TIMEOUT}s (sig={sig})"
+                time.sleep(2 + attempt)
+
+            except Exception as e:
+                last_err = str(e)[:400]
+                time.sleep(2 + attempt)
+
+        return {"success": False, "signature": None, "error": last_err or "Unknown error"}
+
     except Exception as e:
-        return {"success": False, "signature": None, "error": str(e)[:300], "details": {}}
+        return {"success": False, "signature": None, "error": str(e)[:400]}
