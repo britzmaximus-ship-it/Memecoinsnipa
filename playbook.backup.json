@@ -41,58 +41,10 @@
       "note": "**\n\n* ADDED: Prioritize tokens with strong buy pressure and whale accumulation.\n* MODIFIED: Be more cautious with tokens that have similar patterns to past losing picks.\n* REMOVED: None\n\n**"
     }
   ],
-  "scans": 51,
+  "scans": 52,
   "tokens_seen": [
     {
       "name": "Frog CEO (FROGCEO)",
-      "date": "2026-02-17T00:48"
-    },
-    {
-      "name": "Essence Of Time (Time)",
-      "date": "2026-02-17T00:48"
-    },
-    {
-      "name": "ORGAZM (ORGAZM)",
-      "date": "2026-02-17T00:48"
-    },
-    {
-      "name": "b\u01d0ngw\u01d4 (\u4e19\u5348)",
-      "date": "2026-02-17T00:48"
-    },
-    {
-      "name": "Mog Coin (MOG)",
-      "date": "2026-02-17T00:48"
-    },
-    {
-      "name": "SAVE (SAVE)",
-      "date": "2026-02-17T00:48"
-    },
-    {
-      "name": "MUNCHKIN (MUNCHKIN)",
-      "date": "2026-02-17T00:48"
-    },
-    {
-      "name": "Trenches Game (TRENCH)",
-      "date": "2026-02-17T00:48"
-    },
-    {
-      "name": "Clavicular (Clav)",
-      "date": "2026-02-17T00:51"
-    },
-    {
-      "name": "firewu (FIREWU)",
-      "date": "2026-02-17T00:51"
-    },
-    {
-      "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
-      "date": "2026-02-17T00:51"
-    },
-    {
-      "name": "Preguntale (Preguntale)",
-      "date": "2026-02-17T00:51"
-    },
-    {
-      "name": "Frog CEO (FROGCEO)",
       "date": "2026-02-17T00:51"
     },
     {
@@ -842,9 +794,57 @@
     {
       "name": "Trenches Game (TRENCH)",
       "date": "2026-02-17T04:39"
+    },
+    {
+      "name": "firewu (FIREWU)",
+      "date": "2026-02-17T04:40"
+    },
+    {
+      "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
+      "date": "2026-02-17T04:40"
+    },
+    {
+      "name": "Preguntale (Preguntale)",
+      "date": "2026-02-17T04:40"
+    },
+    {
+      "name": "Frog CEO (FROGCEO)",
+      "date": "2026-02-17T04:40"
+    },
+    {
+      "name": "Essence Of Time (Time)",
+      "date": "2026-02-17T04:40"
+    },
+    {
+      "name": "ORGAZM (ORGAZM)",
+      "date": "2026-02-17T04:40"
+    },
+    {
+      "name": "SAVE (SAVE)",
+      "date": "2026-02-17T04:40"
+    },
+    {
+      "name": "b\u01d0ngw\u01d4 (\u4e19\u5348)",
+      "date": "2026-02-17T04:40"
+    },
+    {
+      "name": "MELON MUSK (MELON)",
+      "date": "2026-02-17T04:40"
+    },
+    {
+      "name": "MUNCHKIN (MUNCHKIN)",
+      "date": "2026-02-17T04:40"
+    },
+    {
+      "name": "FORESKIN (FORESKIN)",
+      "date": "2026-02-17T04:40"
+    },
+    {
+      "name": "Trenches Game (TRENCH)",
+      "date": "2026-02-17T04:40"
     }
   ],
-  "last_scan": "2026-02-17T04:39",
+  "last_scan": "2026-02-17T04:40",
   "active_picks": [],
   "pick_history": [
     {
@@ -3233,18 +3233,11 @@
       "confidence": 8,
       "reason": "Strong buy pressure, Vol spike 3.96x",
       "opened_at": "2026-02-16T18:46",
-      "last_update": "2026-02-17T04:39",
+      "last_update": "2026-02-17T04:40",
       "peak_price": 8.095206999999999e-06,
       "lowest_price": 6.983e-06,
-      "scans_monitored": 39,
+      "scans_monitored": 40,
       "updates": [
-        {
-          "scan": 20,
-          "price": 7.505e-06,
-          "action": "HOLD",
-          "reason": "Monitoring (-7.3%)",
-          "time": "2026-02-16T23:02"
-        },
         {
           "scan": 21,
           "price": 7.505e-06,
@@ -3377,6 +3370,13 @@
           "action": "HOLD",
           "reason": "Monitoring (-7.0%)",
           "time": "2026-02-17T04:39"
+        },
+        {
+          "scan": 40,
+          "price": 7.527e-06,
+          "action": "HOLD",
+          "reason": "Monitoring (-7.0%)",
+          "time": "2026-02-17T04:40"
         }
       ],
       "entry_snapshot": {
@@ -3421,18 +3421,11 @@
       "confidence": 8,
       "reason": "Moderate buy pressure, low volume spike, and high buy ratio",
       "opened_at": "2026-02-16T21:58",
-      "last_update": "2026-02-17T04:39",
+      "last_update": "2026-02-17T04:40",
       "peak_price": 5.6127173e-06,
       "lowest_price": 4.352e-06,
-      "scans_monitored": 24,
+      "scans_monitored": 25,
       "updates": [
-        {
-          "scan": 5,
-          "price": 4.978e-06,
-          "action": "HOLD",
-          "reason": "Monitoring (-11.3%)",
-          "time": "2026-02-16T23:02"
-        },
         {
           "scan": 6,
           "price": 4.579e-06,
@@ -3565,6 +3558,13 @@
           "action": "HOLD",
           "reason": "Monitoring (-22.5%)",
           "time": "2026-02-17T04:39"
+        },
+        {
+          "scan": 25,
+          "price": 4.352e-06,
+          "action": "HOLD",
+          "reason": "Monitoring (-22.5%)",
+          "time": "2026-02-17T04:40"
         }
       ],
       "entry_snapshot": {
@@ -3609,18 +3609,11 @@
       "confidence": 8,
       "reason": "Low market cap, moderate buy pressure, and no extreme volume spikes",
       "opened_at": "2026-02-16T22:49",
-      "last_update": "2026-02-17T04:39",
+      "last_update": "2026-02-17T04:40",
       "peak_price": 8.475588000000001e-06,
       "lowest_price": 6.396e-06,
-      "scans_monitored": 22,
+      "scans_monitored": 23,
       "updates": [
-        {
-          "scan": 3,
-          "price": 8.302e-06,
-          "action": "HOLD",
-          "reason": "Monitoring (-2.0%)",
-          "time": "2026-02-16T23:02"
-        },
         {
           "scan": 4,
           "price": 7.551e-06,
@@ -3753,6 +3746,13 @@
           "action": "HOLD",
           "reason": "Monitoring (-24.5%)",
           "time": "2026-02-17T04:39"
+        },
+        {
+          "scan": 23,
+          "price": 6.396e-06,
+          "action": "HOLD",
+          "reason": "Monitoring (-24.5%)",
+          "time": "2026-02-17T04:40"
         }
       ],
       "entry_snapshot": {
@@ -3865,7 +3865,7 @@
   },
   "paper_trade_id_counter": 5,
   "pending_paper_trades": [],
-  "last_update_id": 574228924,
+  "last_update_id": 574228925,
   "token_blacklist": {
     "8yyBAFFfCA4fKw1Ai1SExtSf6DmVckGGDT8XgHUopump": {
       "name": "Mochi Panda",
