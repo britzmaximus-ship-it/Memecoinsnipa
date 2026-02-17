@@ -1,15 +1,13 @@
 """
-trader.py - Solana Trading Module for Memecoinsnipa v2.2
+trader.py - Solana Trading Module for Memecoinsnipa v2.3
 
-Uses Jupiter V6 API for token swaps on Solana.
+Uses Jupiter Swap API v1 (api.jup.ag) for token swaps on Solana.
 Handles buy/sell with safety controls and detailed error reporting.
 
-Changes from v2.1:
-- Added pre-flight diagnostics (RPC reachability, wallet load, balance) with detailed errors
-- Every failure path returns a specific, descriptive error string
-- Added RPC URL validation and empty-URL detection
-- Added timeout to all Jupiter API calls
-- Improved logging at every step for GitHub Actions artifact debugging
+Changes from v2.2:
+- Migrated from deprecated Jupiter V6 (quote-api.jup.ag) to new Jupiter API (api.jup.ag/swap/v1)
+- Added JUPITER_API_KEY support via environment variable
+- All other v2.2 improvements retained (pre-flight, error reporting, etc.)
 """
 
 import os
@@ -32,8 +30,10 @@ log = logging.getLogger("trader")
 
 LAMPORTS_PER_SOL = 1_000_000_000
 SOL_MINT = "So11111111111111111111111111111111111111112"
-JUPITER_QUOTE_URL = "https://quote-api.jup.ag/v6/quote"
-JUPITER_SWAP_URL = "https://quote-api.jup.ag/v6/swap"
+# Jupiter API v1 endpoints (V6 quote-api.jup.ag was deprecated Dec 2024)
+JUPITER_BASE_URL = "https://api.jup.ag/swap/v1"
+JUPITER_QUOTE_URL = f"{JUPITER_BASE_URL}/quote"
+JUPITER_SWAP_URL = f"{JUPITER_BASE_URL}/swap"
 DEFAULT_SLIPPAGE_BPS = 2500  # 25% slippage tolerance
 MAX_RETRIES = 3
 CONFIRM_TIMEOUT = 60
@@ -64,6 +64,17 @@ def get_rpc_url() -> str:
         log.warning("SOLANA_RPC_URL is empty! Falling back to public RPC (unreliable)")
         return "https://api.mainnet-beta.solana.com"
     return url
+
+
+def get_jupiter_headers() -> dict:
+    """Build headers for Jupiter API calls, including API key if available."""
+    headers = {"Accept": "application/json"}
+    api_key = os.environ.get("JUPITER_API_KEY", "").strip()
+    if api_key:
+        headers["x-api-key"] = api_key
+    else:
+        log.warning("JUPITER_API_KEY not set - using Jupiter free tier (rate limited)")
+    return headers
 
 
 # ============================================================
@@ -201,6 +212,11 @@ def preflight_check() -> dict:
     if not rpc_url:
         errors.append("SOLANA_RPC_URL is empty - using unreliable public RPC")
 
+    # Check Jupiter API key
+    jup_key = os.environ.get("JUPITER_API_KEY", "").strip()
+    if not jup_key:
+        errors.append("JUPITER_API_KEY not set - Jupiter free tier is rate limited")
+
     # Check wallet
     try:
         wallet = load_wallet()
@@ -228,19 +244,20 @@ def preflight_check() -> dict:
 
 def jupiter_swap(input_mint: str, output_mint: str, amount: int, wallet: Keypair) -> dict:
     """
-    Execute a swap via Jupiter V6 API.
+    Execute a swap via Jupiter Swap API v1.
     Returns {'success': bool, 'signature': str|None, 'error': str|None}
     """
     try:
         # Step 1: Get quote
         log.info(f"Jupiter quote: {input_mint[:12]}... -> {output_mint[:12]}... amount={amount}")
         try:
+            jup_headers = get_jupiter_headers()
             quote_resp = requests.get(JUPITER_QUOTE_URL, params={
                 "inputMint": input_mint,
                 "outputMint": output_mint,
                 "amount": amount,
                 "slippageBps": DEFAULT_SLIPPAGE_BPS,
-            }, timeout=JUPITER_QUOTE_TIMEOUT)
+            }, headers=jup_headers, timeout=JUPITER_QUOTE_TIMEOUT)
         except requests.exceptions.Timeout:
             return {"success": False, "signature": None,
                     "error": f"Jupiter quote timed out ({JUPITER_QUOTE_TIMEOUT}s)"}
@@ -264,13 +281,14 @@ def jupiter_swap(input_mint: str, output_mint: str, amount: int, wallet: Keypair
         # Step 2: Get swap transaction
         log.info("Requesting Jupiter swap transaction...")
         try:
+            swap_headers = {**jup_headers, "Content-Type": "application/json"}
             swap_resp = requests.post(JUPITER_SWAP_URL, json={
                 "quoteResponse": quote,
                 "userPublicKey": str(wallet.pubkey()),
                 "wrapAndUnwrapSol": True,
                 "dynamicComputeUnitLimit": True,
                 "prioritizationFeeLamports": "auto",
-            }, timeout=JUPITER_SWAP_TIMEOUT)
+            }, headers=swap_headers, timeout=JUPITER_SWAP_TIMEOUT)
         except requests.exceptions.Timeout:
             return {"success": False, "signature": None,
                     "error": f"Jupiter swap API timed out ({JUPITER_SWAP_TIMEOUT}s)"}
