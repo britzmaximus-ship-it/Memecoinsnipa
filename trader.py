@@ -205,7 +205,7 @@ def _http_post(url: str, body: dict, timeout: int = 60) -> dict:
                 time.sleep(0.8 * (attempt + 1))
                 continue
             raise
-def _get_quote_route(input_mint: str, output_mint: str, amount_lamports: int) -> dict:
+def _get_quote_route(input_mint: str, output_mint: str, amount_lamports: int, slippage_bps: Optional[int] = None) -> dict:
     """Fetch a Jupiter quote and return a quote object usable for /swap.
 
     Supports both:
@@ -216,7 +216,7 @@ def _get_quote_route(input_mint: str, output_mint: str, amount_lamports: int) ->
         "inputMint": input_mint,
         "outputMint": output_mint,
         "amount": amount_lamports,
-        "slippageBps": SLIPPAGE_BPS,
+        "slippageBps": (slippage_bps if slippage_bps is not None else SLIPPAGE_BPS),
         "onlyDirectRoutes": False,
     }
 
