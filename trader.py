@@ -43,15 +43,42 @@ log = logging.getLogger("trader")
 LAMPORTS_PER_SOL = 1_000_000_000
 SOL_MINT = "So11111111111111111111111111111111111111112"
 
-# CURRENT Jupiter v6 endpoints
-JUPITER_QUOTE_URLS = [
-    "https://lite-api.jup.ag/swap/v1/quote",  # recommended Swap API base
-    "https://quote-api.jup.ag/v6/quote",      # legacy fallback
-]
-JUPITER_SWAP_URLS = [
-    "https://lite-api.jup.ag/swap/v1/swap",   # recommended Swap API base
-    "https://quote-api.jup.ag/v6/swap",       # legacy fallback
-]
+# Jupiter endpoints (fallback list)
+#
+# Jupiter has multiple public gateways. Some are versioned (v6), while others are
+# "base" gateways documented as /quote and /swap (e.g. https://public.jupiterapi.com).
+#
+# To make this bot resilient to DNS issues or gateway outages, we try multiple bases.
+# You can force a preferred base with env var JUPITER_API_BASE.
+JUPITER_API_BASE = os.environ.get("JUPITER_API_BASE", "").strip().rstrip("/")
+
+_BASES: list[str] = [b for b in [JUPITER_API_BASE] if b]
+
+# Public gateway (commonly used for the Swap API)
+_BASES += ["https://public.jupiterapi.com"]
+
+# Alternate/legacy gateways
+_BASES += ["https://lite-api.jup.ag", "https://quote-api.jup.ag"]
+
+def _build_endpoints(base: str) -> tuple[str, str, str, str, str, str]:
+    """Return common endpoint variants for a given base."""
+    base = base.rstrip("/")
+    return (
+        f"{base}/swap/v1/quote",
+        f"{base}/swap/v1/swap",
+        f"{base}/v6/quote",
+        f"{base}/v6/swap",
+        f"{base}/quote",
+        f"{base}/swap",
+    )
+
+JUPITER_QUOTE_URLS: list[str] = []
+JUPITER_SWAP_URLS: list[str] = []
+for b in _BASES:
+    q_swap_v1, s_swap_v1, q_v6, s_v6, q_base, s_base = _build_endpoints(b)
+    # Try the modern Swap API style first, then base style, then v6.
+    JUPITER_QUOTE_URLS += [q_swap_v1, q_base, q_v6]
+    JUPITER_SWAP_URLS += [s_swap_v1, s_base, s_v6]
 
 DEFAULT_SLIPPAGE_BPS = int(os.environ.get("DEFAULT_SLIPPAGE_BPS", "2500"))  # 25%
 MAX_RETRIES = int(os.environ.get("MAX_RETRIES", "3"))
@@ -221,6 +248,7 @@ def _get_quote_route(input_mint: str, output_mint: str, amount_lamports: int, sl
     }
 
     last_err: Optional[Exception] = None
+    errs: list[str] = []
     for url in JUPITER_QUOTE_URLS:
         try:
             data = _http_get(url, params=params, timeout=20)
@@ -233,10 +261,13 @@ def _get_quote_route(input_mint: str, output_mint: str, amount_lamports: int, sl
             raise RuntimeError(f"Unexpected quote response shape from {url}. Keys={list(data.keys()) if isinstance(data, dict) else type(data)}")
         except Exception as e:
             last_err = e
+            msg = f"{url} -> {str(e)[:180]}"
+            errs.append(msg)
             log.warning(f"Quote failed via {url}: {str(e)[:180]}")
             continue
 
-    raise RuntimeError(f"All quote endpoints failed. Last error: {str(last_err)[:200] if last_err else 'unknown'}")
+    detail = " | ".join(errs[-4:]) if errs else (str(last_err)[:200] if last_err else "unknown")
+    raise RuntimeError(f"All quote endpoints failed. Last errors: {detail}")
 def _get_swap_tx(route: dict, user_pubkey: str) -> str:
     """Return base64 swapTransaction string (tries multiple Jupiter endpoints)."""
     body: Dict[str, Any] = {
@@ -249,6 +280,7 @@ def _get_swap_tx(route: dict, user_pubkey: str) -> str:
         body["prioritizationFeeLamports"] = PRIORITY_FEE_LAMPORTS
 
     last_err: Optional[Exception] = None
+    errs: list[str] = []
     for url in JUPITER_SWAP_URLS:
         try:
             data = _http_post(url, body=body, timeout=30)
@@ -258,10 +290,13 @@ def _get_swap_tx(route: dict, user_pubkey: str) -> str:
             raise RuntimeError(f"No swapTransaction returned. Keys={list(data.keys()) if isinstance(data, dict) else type(data)}")
         except Exception as e:
             last_err = e
+            msg = f"{url} -> {str(e)[:180]}"
+            errs.append(msg)
             log.warning(f"Swap failed via {url}: {str(e)[:180]}")
             continue
 
-    raise RuntimeError(f"All swap endpoints failed. Last error: {str(last_err)[:200] if last_err else 'unknown'}")
+    detail = " | ".join(errs[-4:]) if errs else (str(last_err)[:200] if last_err else "unknown")
+    raise RuntimeError(f"All swap endpoints failed. Last errors: {detail}")
 def _send_raw_tx(b64_tx: str) -> str:
     cfg = {
         "encoding": "base64",
