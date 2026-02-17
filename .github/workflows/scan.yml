@@ -13,7 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -34,19 +33,17 @@ jobs:
           SOLANA_RPC_URL: ${{ secrets.SOLANA_RPC_URL }}
           MAX_SOL_PER_TRADE: ${{ secrets.MAX_SOL_PER_TRADE }}
           LIVE_TRADING_ENABLED: ${{ secrets.LIVE_TRADING_ENABLED }}
+          JUPITER_API_KEY: ${{ secrets.JUPITER_API_KEY }}
 
       - name: Commit playbook updates
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
           git add playbook.json playbook.backup.json || true
           if ! git diff --staged --quiet; then
             SCAN_COUNT=$(python -c 'import json; data=json.load(open("playbook.json")); print(data.get("scans", "unknown"))' 2>/dev/null || echo "unknown")
             git commit -m "Update playbook (scan #$SCAN_COUNT)"
             git push
-          else
-            echo "No changes detected"
           fi
 
       - name: Upload scanner log
