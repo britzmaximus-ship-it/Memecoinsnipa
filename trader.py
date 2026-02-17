@@ -44,8 +44,14 @@ LAMPORTS_PER_SOL = 1_000_000_000
 SOL_MINT = "So11111111111111111111111111111111111111112"
 
 # CURRENT Jupiter v6 endpoints
-JUPITER_QUOTE_URL = "https://quote-api.jup.ag/v6/quote"
-JUPITER_SWAP_URL  = "https://quote-api.jup.ag/v6/swap"
+JUPITER_QUOTE_URLS = [
+    "https://lite-api.jup.ag/swap/v1/quote",  # recommended Swap API base
+    "https://quote-api.jup.ag/v6/quote",      # legacy fallback
+]
+JUPITER_SWAP_URLS = [
+    "https://lite-api.jup.ag/swap/v1/swap",   # recommended Swap API base
+    "https://quote-api.jup.ag/v6/swap",       # legacy fallback
+]
 
 DEFAULT_SLIPPAGE_BPS = int(os.environ.get("DEFAULT_SLIPPAGE_BPS", "2500"))  # 25%
 MAX_RETRIES = int(os.environ.get("MAX_RETRIES", "3"))
@@ -160,40 +166,81 @@ def _load_wallet() -> Keypair:
 # =========================
 
 def _http_get(url: str, params: dict, timeout: int = 30) -> dict:
-    r = requests.get(url, params=params, timeout=timeout)
-    r.raise_for_status()
-    return r.json()
+    """GET JSON with basic retries (handles transient DNS/429/5xx)."""
+    last_err: Optional[Exception] = None
+    for attempt in range(3):
+        try:
+            r = requests.get(url, params=params, timeout=timeout)
+            if r.status_code == 429 and attempt < 2:
+                time.sleep(1.5 * (attempt + 1))
+                continue
+            if r.status_code >= 500 and attempt < 2:
+                time.sleep(1.0 * (attempt + 1))
+                continue
+            r.raise_for_status()
+            return r.json()
+        except Exception as e:
+            last_err = e
+            if attempt < 2:
+                time.sleep(0.8 * (attempt + 1))
+                continue
+            raise
+def _http_post(url: str, body: dict, timeout: int = 60) -> dict:
+    """POST JSON with basic retries (handles transient DNS/429/5xx)."""
+    last_err: Optional[Exception] = None
+    for attempt in range(3):
+        try:
+            r = requests.post(url, json=body, timeout=timeout)
+            if r.status_code == 429 and attempt < 2:
+                time.sleep(1.5 * (attempt + 1))
+                continue
+            if r.status_code >= 500 and attempt < 2:
+                time.sleep(1.0 * (attempt + 1))
+                continue
+            r.raise_for_status()
+            return r.json()
+        except Exception as e:
+            last_err = e
+            if attempt < 2:
+                time.sleep(0.8 * (attempt + 1))
+                continue
+            raise
+def _get_quote_route(input_mint: str, output_mint: str, amount_lamports: int) -> dict:
+    """Fetch a Jupiter quote and return a quote object usable for /swap.
 
-def _http_post(url: str, body: dict, timeout: int = 30) -> dict:
-    r = requests.post(url, json=body, timeout=timeout)
-    r.raise_for_status()
-    return r.json()
-
-def _get_quote_route(input_mint: str, output_mint: str, amount: int, slippage_bps: int) -> dict:
-    """
-    Returns a SINGLE selected route object (quote['data'][0]).
-    Passing the whole quote payload to /swap is a common bug.
+    Supports both:
+      - Swap API v1 (lite-api.jup.ag) which returns a single quote object, and
+      - legacy v6 (quote-api.jup.ag) which returns {'data': [ ... ]}.
     """
     params = {
         "inputMint": input_mint,
         "outputMint": output_mint,
-        "amount": str(amount),
-        "slippageBps": str(slippage_bps),
-        "onlyDirectRoutes": "false",
+        "amount": amount_lamports,
+        "slippageBps": SLIPPAGE_BPS,
+        "onlyDirectRoutes": False,
     }
-    quote = _http_get(JUPITER_QUOTE_URL, params=params, timeout=30)
 
-    routes = quote.get("data") if isinstance(quote, dict) else None
-    if not routes:
-        raise RuntimeError(f"Jupiter quote returned no routes: {str(quote)[:300]}")
-    return routes[0]
+    last_err: Optional[Exception] = None
+    for url in JUPITER_QUOTE_URLS:
+        try:
+            data = _http_get(url, params=params, timeout=20)
+            # v6 shape: {'data': [route1, route2, ...]}
+            if isinstance(data, dict) and isinstance(data.get("data"), list) and data["data"]:
+                return data["data"][0]
+            # v1 shape: a single quote object with keys like 'routePlan' and 'outAmount'
+            if isinstance(data, dict) and ("routePlan" in data or "outAmount" in data):
+                return data
+            raise RuntimeError(f"Unexpected quote response shape from {url}. Keys={list(data.keys()) if isinstance(data, dict) else type(data)}")
+        except Exception as e:
+            last_err = e
+            log.warning(f"Quote failed via {url}: {str(e)[:180]}")
+            continue
 
+    raise RuntimeError(f"All quote endpoints failed. Last error: {str(last_err)[:200] if last_err else 'unknown'}")
 def _get_swap_tx(route: dict, user_pubkey: str) -> str:
-    """
-    Returns base64 swapTransaction string.
-    """
+    """Return base64 swapTransaction string (tries multiple Jupiter endpoints)."""
     body: Dict[str, Any] = {
-        "quoteResponse": route,        # IMPORTANT: one route object
+        "quoteResponse": route,
         "userPublicKey": user_pubkey,
         "wrapAndUnwrapSol": True,
         "dynamicComputeUnitLimit": True,
@@ -201,13 +248,20 @@ def _get_swap_tx(route: dict, user_pubkey: str) -> str:
     if PRIORITY_FEE_LAMPORTS > 0:
         body["prioritizationFeeLamports"] = PRIORITY_FEE_LAMPORTS
 
-    data = _http_post(JUPITER_SWAP_URL, body=body, timeout=30)
-    swap_tx = data.get("swapTransaction")
-    if not swap_tx:
-        # Provide a tight error message for Telegram
-        raise RuntimeError(f"No swapTransaction returned. Keys={list(data.keys())} body_error={str(data)[:250]}")
-    return swap_tx
+    last_err: Optional[Exception] = None
+    for url in JUPITER_SWAP_URLS:
+        try:
+            data = _http_post(url, body=body, timeout=30)
+            swap_tx = data.get("swapTransaction") if isinstance(data, dict) else None
+            if swap_tx:
+                return swap_tx
+            raise RuntimeError(f"No swapTransaction returned. Keys={list(data.keys()) if isinstance(data, dict) else type(data)}")
+        except Exception as e:
+            last_err = e
+            log.warning(f"Swap failed via {url}: {str(e)[:180]}")
+            continue
 
+    raise RuntimeError(f"All swap endpoints failed. Last error: {str(last_err)[:200] if last_err else 'unknown'}")
 def _send_raw_tx(b64_tx: str) -> str:
     cfg = {
         "encoding": "base64",
