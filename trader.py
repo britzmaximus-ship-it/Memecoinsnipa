@@ -1,500 +1,220 @@
 """
-trader.py - Solana Trading Module (Jupiter v6) for Memecoinsnipa
-
-Purpose:
-- Execute REAL buys/sells on Solana via Jupiter.
-- Provide wallet status for the scanner.
-- Match the scanner.py expectations:
-    * buy_token(mint, sol_amount) -> {"success": bool, "signature": str|None, "error": str|None}
-    * sell_token(mint)            -> {"success": bool, "signature": str|None, "error": str|None}
-    * get_wallet_summary()        -> {"balance_sol": float, "pubkey": str, "live_trading": bool, "max_per_trade": float} OR {"error": "..."}
-    * is_live_trading_enabled()   -> bool
-
-Key fixes (vs common broken versions):
-- Uses CURRENT Jupiter endpoints:
-    https://quote-api.jup.ag/v6/quote
-    https://quote-api.jup.ag/v6/swap
-  (Old endpoints like https://api.jup.ag/swap/v1/quote may return 401 now.)
-- Passes a SINGLE selected route object to /swap (quote["data"][0]) — not the whole quote payload.
-  This prevents: "No swapTransaction returned".
-- Sell function auto-detects your token balance and sells 100% by default.
+trader.py — CLEAN STABLE VERSION
+Uses Jupiter Swap API v1 only (api.jup.ag)
+No fallback endpoints. No v6. No rotation.
 """
-
-from __future__ import annotations
 
 import os
 import time
 import json
 import base64
-import logging
-from typing import Any, Dict, Optional, Tuple
-
 import requests
+import base58
+
 from solders.keypair import Keypair
-from solders.pubkey import Pubkey
 from solders.transaction import VersionedTransaction
 
-log = logging.getLogger("trader")
-
-# =========================
-# Constants / Config
-# =========================
+# ============================================================
+# CONSTANTS
+# ============================================================
 
 LAMPORTS_PER_SOL = 1_000_000_000
 SOL_MINT = "So11111111111111111111111111111111111111112"
 
-# Jupiter endpoints (fallback list)
-#
-# Jupiter has multiple public gateways. Some are versioned (v6), while others are
-# "base" gateways documented as /quote and /swap (e.g. https://public.jupiterapi.com).
-#
-# To make this bot resilient to DNS issues or gateway outages, we try multiple bases.
-# You can force a preferred base with env var JUPITER_API_BASE.
-JUPITER_API_BASE = os.environ.get("JUPITER_API_BASE", "").strip().rstrip("/")
+JUPITER_QUOTE_URL = "https://api.jup.ag/swap/v1/quote"
+JUPITER_SWAP_URL = "https://api.jup.ag/swap/v1/swap"
 
-_BASES: list[str] = [b for b in [JUPITER_API_BASE] if b]
+CONFIRM_TIMEOUT = 60
 
-# Public gateway (commonly used for the Swap API)
-_BASES += ["https://public.jupiterapi.com"]
 
-# Alternate/legacy gateways
-_BASES += ["https://lite-api.jup.ag", "https://quote-api.jup.ag"]
+# ============================================================
+# ENV HELPERS
+# ============================================================
 
-def _build_endpoints(base: str) -> tuple[str, str, str, str, str, str]:
-    """Return common endpoint variants for a given base."""
-    base = base.rstrip("/")
-    return (
-        f"{base}/swap/v1/quote",
-        f"{base}/swap/v1/swap",
-        f"{base}/v6/quote",
-        f"{base}/v6/swap",
-        f"{base}/quote",
-        f"{base}/swap",
-    )
+def is_live_trading_enabled():
+    return os.environ.get("LIVE_TRADING_ENABLED", "false").lower() == "true"
 
-JUPITER_QUOTE_URLS: list[str] = []
-JUPITER_SWAP_URLS: list[str] = []
-for b in _BASES:
-    q_swap_v1, s_swap_v1, q_v6, s_v6, q_base, s_base = _build_endpoints(b)
-    # Try the modern Swap API style first, then base style, then v6.
-    JUPITER_QUOTE_URLS += [q_swap_v1, q_base, q_v6]
-    JUPITER_SWAP_URLS += [s_swap_v1, s_base, s_v6]
 
-DEFAULT_SLIPPAGE_BPS = int(os.environ.get("DEFAULT_SLIPPAGE_BPS", "2500"))  # 25%
-MAX_RETRIES = int(os.environ.get("MAX_RETRIES", "3"))
-CONFIRM_TIMEOUT = int(os.environ.get("CONFIRM_TIMEOUT", "60"))
+def get_max_sol_per_trade():
+    return float(os.environ.get("MAX_SOL_PER_TRADE", "0.03"))
 
-# Preflight ON by default (safer; fewer "ghost tx" situations)
-SKIP_PREFLIGHT = os.environ.get("SKIP_PREFLIGHT", "false").lower() == "true"
-PREFLIGHT_COMMITMENT = os.environ.get("PREFLIGHT_COMMITMENT", "processed")
-CONFIRM_COMMITMENT = os.environ.get("CONFIRM_COMMITMENT", "confirmed")
 
-# Optional priority fee (0 disables)
-PRIORITY_FEE_LAMPORTS = int(os.environ.get("PRIORITY_FEE_LAMPORTS", "0"))
+def get_rpc_url():
+    return os.environ.get("SOLANA_RPC_URL")
 
-# Keep some SOL so you never hard-brick yourself
-MIN_SOL_RESERVE = float(os.environ.get("MIN_SOL_RESERVE", "0.01"))
 
-# Scanner uses this env var for sizing trades
-MAX_SOL_PER_TRADE_DEFAULT = float(os.environ.get("MAX_SOL_PER_TRADE", "0.03"))
+# ============================================================
+# WALLET
+# ============================================================
 
+def load_wallet():
+    pk = os.environ.get("WALLET_PRIVATE_KEY_BASE58")
+    if not pk:
+        raise EnvironmentError("WALLET_PRIVATE_KEY_BASE58 env var is missing")
+
+    key_bytes = base58.b58decode(pk)
+    return Keypair.from_bytes(key_bytes)
+
+
+# ============================================================
 # RPC
-DEFAULT_PUBLIC_RPC = "https://api.mainnet-beta.solana.com"
-RPC_TIMEOUT = int(os.environ.get("RPC_TIMEOUT", "30"))
+# ============================================================
 
+def rpc_call(method, params):
+    rpc_url = get_rpc_url()
+    if not rpc_url:
+        raise EnvironmentError("SOLANA_RPC_URL is missing")
 
-# =========================
-# Env / Feature flags
-# =========================
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": method,
+        "params": params,
+    }
 
-def is_live_trading_enabled() -> bool:
-    """
-    Scanner gates real trades on this.
-    Accepts: "true/1/yes/on" (case-insensitive).
-    """
-    v = (os.environ.get("LIVE_TRADING_ENABLED", "") or os.environ.get("LIVE_TRADING", "")).strip().lower()
-    return v in ("1", "true", "yes", "y", "on")
-
-
-# =========================
-# RPC helpers
-# =========================
-
-def _rpc_url() -> str:
-    # Allow scanner.py to run even if user forgot SOLANA_RPC_URL.
-    # But warn: public RPC can be flaky for trading.
-    url = os.environ.get("SOLANA_RPC_URL", "").strip()
-    return url or DEFAULT_PUBLIC_RPC
-
-def _rpc(method: str, params: list) -> Any:
-    payload = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}
-    r = requests.post(_rpc_url(), json=payload, timeout=RPC_TIMEOUT)
+    r = requests.post(rpc_url, json=payload, timeout=30)
     r.raise_for_status()
-    data = r.json()
-    if "error" in data:
-        raise RuntimeError(f"RPC error: {data['error']}")
-    return data["result"]
-
-def _sol_balance(pubkey_str: str) -> float:
-    res = _rpc("getBalance", [pubkey_str, {"commitment": "processed"}])
-    return float(res["value"]) / LAMPORTS_PER_SOL
+    return r.json()
 
 
-# =========================
-# Wallet loading
-# =========================
-
-def _load_wallet() -> Keypair:
-    """
-    Supports multiple env var names (so you don't have to rename things again):
-
-    Preferred (base58 64-byte secret key):
-      - WALLET_PRIVATE_KEY_BASE58   (what scanner.py expects)
-      - SOLANA_PRIVATE_KEY_B58
-      - SOLANA_PRIVATE_KEY_BASE58
-
-    Also supports JSON array of ints (Phantom export style sometimes):
-      - SOLANA_PRIVATE_KEY          (e.g. "[12,34,...]")
-    """
-    # Base58 variants
-    b58 = (
-        os.environ.get("WALLET_PRIVATE_KEY_BASE58", "")
-        or os.environ.get("SOLANA_PRIVATE_KEY_B58", "")
-        or os.environ.get("SOLANA_PRIVATE_KEY_BASE58", "")
-    ).strip()
-
-    if b58:
-        try:
-            import base58
-            secret = base58.b58decode(b58)
-            kp = Keypair.from_bytes(secret)
-            log.info(f"Wallet loaded: {kp.pubkey()}")
-            return kp
-        except Exception as e:
-            raise RuntimeError(f"Failed to load base58 key: {e}")
-
-    # JSON array variant
-    raw = os.environ.get("SOLANA_PRIVATE_KEY", "").strip()
-    if raw:
-        try:
-            arr = json.loads(raw)
-            secret = bytes(arr)
-            kp = Keypair.from_bytes(secret)
-            log.info(f"Wallet loaded: {kp.pubkey()}")
-            return kp
-        except Exception as e:
-            raise RuntimeError(f"Failed to load JSON key array: {e}")
-
-    raise RuntimeError("WALLET_PRIVATE_KEY_BASE58 env var is missing (or SOLANA_PRIVATE_KEY_B58 / SOLANA_PRIVATE_KEY_BASE58 / SOLANA_PRIVATE_KEY)")
-
-
-# =========================
-# Jupiter helpers
-# =========================
-
-def _http_get(url: str, params: dict, timeout: int = 30) -> dict:
-    """GET JSON with basic retries (handles transient DNS/429/5xx)."""
-    last_err: Optional[Exception] = None
-    for attempt in range(3):
-        try:
-            r = requests.get(url, params=params, timeout=timeout)
-            if r.status_code == 429 and attempt < 2:
-                time.sleep(1.5 * (attempt + 1))
-                continue
-            if r.status_code >= 500 and attempt < 2:
-                time.sleep(1.0 * (attempt + 1))
-                continue
-            r.raise_for_status()
-            return r.json()
-        except Exception as e:
-            last_err = e
-            if attempt < 2:
-                time.sleep(0.8 * (attempt + 1))
-                continue
-            raise
-def _http_post(url: str, body: dict, timeout: int = 60) -> dict:
-    """POST JSON with basic retries (handles transient DNS/429/5xx)."""
-    last_err: Optional[Exception] = None
-    for attempt in range(3):
-        try:
-            r = requests.post(url, json=body, timeout=timeout)
-            if r.status_code == 429 and attempt < 2:
-                time.sleep(1.5 * (attempt + 1))
-                continue
-            if r.status_code >= 500 and attempt < 2:
-                time.sleep(1.0 * (attempt + 1))
-                continue
-            r.raise_for_status()
-            return r.json()
-        except Exception as e:
-            last_err = e
-            if attempt < 2:
-                time.sleep(0.8 * (attempt + 1))
-                continue
-            raise
-def _get_quote_route(input_mint: str, output_mint: str, amount_lamports: int, slippage_bps: Optional[int] = None) -> dict:
-    """Fetch a Jupiter quote and return a quote object usable for /swap.
-
-    Supports both:
-      - Swap API v1 (lite-api.jup.ag) which returns a single quote object, and
-      - legacy v6 (quote-api.jup.ag) which returns {'data': [ ... ]}.
-    """
-    params = {
-        "inputMint": input_mint,
-        "outputMint": output_mint,
-        "amount": amount_lamports,
-        "slippageBps": (slippage_bps if slippage_bps is not None else SLIPPAGE_BPS),
-        "onlyDirectRoutes": False,
-    }
-
-    last_err: Optional[Exception] = None
-    errs: list[str] = []
-    for url in JUPITER_QUOTE_URLS:
-        try:
-            data = _http_get(url, params=params, timeout=20)
-            # v6 shape: {'data': [route1, route2, ...]}
-            if isinstance(data, dict) and isinstance(data.get("data"), list) and data["data"]:
-                return data["data"][0]
-            # v1 shape: a single quote object with keys like 'routePlan' and 'outAmount'
-            if isinstance(data, dict) and ("routePlan" in data or "outAmount" in data):
-                return data
-            raise RuntimeError(f"Unexpected quote response shape from {url}. Keys={list(data.keys()) if isinstance(data, dict) else type(data)}")
-        except Exception as e:
-            last_err = e
-            msg = f"{url} -> {str(e)[:180]}"
-            errs.append(msg)
-            log.warning(f"Quote failed via {url}: {str(e)[:180]}")
-            continue
-
-    detail = " | ".join(errs[-4:]) if errs else (str(last_err)[:200] if last_err else "unknown")
-    raise RuntimeError(f"All quote endpoints failed. Last errors: {detail}")
-def _get_swap_tx(route: dict, user_pubkey: str) -> str:
-    """Return base64 swapTransaction string (tries multiple Jupiter endpoints)."""
-    body: Dict[str, Any] = {
-        "quoteResponse": route,
-        "userPublicKey": user_pubkey,
-        "wrapAndUnwrapSol": True,
-        "dynamicComputeUnitLimit": True,
-    }
-    if PRIORITY_FEE_LAMPORTS > 0:
-        body["prioritizationFeeLamports"] = PRIORITY_FEE_LAMPORTS
-
-    last_err: Optional[Exception] = None
-    errs: list[str] = []
-    for url in JUPITER_SWAP_URLS:
-        try:
-            data = _http_post(url, body=body, timeout=30)
-            swap_tx = data.get("swapTransaction") if isinstance(data, dict) else None
-            if swap_tx:
-                return swap_tx
-            raise RuntimeError(f"No swapTransaction returned. Keys={list(data.keys()) if isinstance(data, dict) else type(data)}")
-        except Exception as e:
-            last_err = e
-            msg = f"{url} -> {str(e)[:180]}"
-            errs.append(msg)
-            log.warning(f"Swap failed via {url}: {str(e)[:180]}")
-            continue
-
-    detail = " | ".join(errs[-4:]) if errs else (str(last_err)[:200] if last_err else "unknown")
-    raise RuntimeError(f"All swap endpoints failed. Last errors: {detail}")
-def _send_raw_tx(b64_tx: str) -> str:
-    cfg = {
-        "encoding": "base64",
-        "skipPreflight": SKIP_PREFLIGHT,
-        "preflightCommitment": PREFLIGHT_COMMITMENT,
-        "maxRetries": 3,
-    }
-    return _rpc("sendTransaction", [b64_tx, cfg])
-
-def _confirm_sig(sig: str, timeout_s: int) -> bool:
+def wait_for_confirmation(signature):
     start = time.time()
-    while time.time() - start < timeout_s:
-        try:
-            st = _rpc("getSignatureStatuses", [[sig], {"searchTransactionHistory": True}])
-            val = st["value"][0]
-            if val is None:
-                time.sleep(2)
-                continue
 
-            if val.get("err") is not None:
-                log.warning(f"Tx {sig} failed: {val.get('err')}")
+    while time.time() - start < CONFIRM_TIMEOUT:
+        result = rpc_call("getSignatureStatuses", [[signature]])
+        status = result["result"]["value"][0]
+
+        if status:
+            if status.get("err"):
                 return False
 
-            conf = val.get("confirmationStatus")
-            if conf in ("confirmed", "finalized"):
+            if status.get("confirmationStatus") in ("confirmed", "finalized"):
                 return True
 
-            time.sleep(2)
-        except Exception as e:
-            log.warning(f"Confirm status error for {sig}: {e}")
-            time.sleep(2)
+        time.sleep(2)
 
-    # last chance
+    return False
+
+
+# ============================================================
+# JUPITER SWAP
+# ============================================================
+
+def jupiter_swap(input_mint, output_mint, amount, wallet):
     try:
-        tx = _rpc("getTransaction", [sig, {"encoding": "jsonParsed", "commitment": CONFIRM_COMMITMENT}])
-        return bool(tx)
-    except Exception:
-        return False
-
-
-# =========================
-# Token balance helpers (for sells)
-# =========================
-
-def _get_token_balance_raw(owner_pubkey: str, mint: str) -> Tuple[int, int]:
-    """
-    Returns (amount_raw, decimals) aggregated across token accounts.
-    """
-    res = _rpc(
-        "getTokenAccountsByOwner",
-        [
-            owner_pubkey,
-            {"mint": mint},
-            {"encoding": "jsonParsed", "commitment": "processed"},
-        ],
-    )
-
-    amount_raw = 0
-    decimals = 0
-    for item in res.get("value", []):
-        info = (
-            item.get("account", {})
-            .get("data", {})
-            .get("parsed", {})
-            .get("info", {})
-        )
-        ta = info.get("tokenAmount", {})
-        amt_str = ta.get("amount", "0")
-        dec = ta.get("decimals", 0)
-        try:
-            amount_raw += int(amt_str)
-            decimals = int(dec)
-        except Exception:
-            continue
-
-    return amount_raw, decimals
-
-
-# =========================
-# Public API expected by scanner.py
-# =========================
-
-def get_wallet_summary() -> dict:
-    """
-    Used by scanner.py to print wallet + mode.
-    """
-    try:
-        kp = _load_wallet()
-        pubkey = str(kp.pubkey())
-        bal = _sol_balance(pubkey)
-        return {
-            "pubkey": pubkey,
-            "balance_sol": round(bal, 6),
-            "live_trading": is_live_trading_enabled(),
-            "max_per_trade": float(os.environ.get("MAX_SOL_PER_TRADE", str(MAX_SOL_PER_TRADE_DEFAULT))),
-            "rpc": _rpc_url(),
+        # ---- STEP 1: QUOTE ----
+        quote_params = {
+            "inputMint": input_mint,
+            "outputMint": output_mint,
+            "amount": amount,
+            "slippageBps": 2500,
         }
+
+        quote_resp = requests.get(JUPITER_QUOTE_URL, params=quote_params, timeout=20)
+        quote_resp.raise_for_status()
+        quote = quote_resp.json()
+
+        if "error" in quote:
+            return {"success": False, "signature": None, "error": quote["error"]}
+
+        # ---- STEP 2: SWAP TX ----
+        swap_payload = {
+            "quoteResponse": quote,
+            "userPublicKey": str(wallet.pubkey()),
+            "wrapAndUnwrapSol": True,
+        }
+
+        swap_resp = requests.post(JUPITER_SWAP_URL, json=swap_payload, timeout=20)
+        swap_resp.raise_for_status()
+        swap_data = swap_resp.json()
+
+        tx_b64 = swap_data.get("swapTransaction")
+        if not tx_b64:
+            return {"success": False, "signature": None, "error": "No swapTransaction returned"}
+
+        # ---- STEP 3: SIGN ----
+        tx_bytes = base64.b64decode(tx_b64)
+        tx = VersionedTransaction.from_bytes(tx_bytes)
+        signed_tx = VersionedTransaction(tx.message, [wallet])
+        raw_tx = bytes(signed_tx)
+
+        # ---- STEP 4: SEND ----
+        send_result = rpc_call("sendTransaction", [
+            base64.b64encode(raw_tx).decode(),
+            {"encoding": "base64"}
+        ])
+
+        signature = send_result.get("result")
+        if not signature:
+            return {"success": False, "signature": None, "error": "No signature returned"}
+
+        # ---- STEP 5: CONFIRM ----
+        confirmed = wait_for_confirmation(signature)
+
+        if confirmed:
+            return {"success": True, "signature": signature, "error": None}
+        else:
+            return {"success": False, "signature": signature, "error": "Transaction not confirmed"}
+
+    except requests.exceptions.HTTPError as e:
+        return {"success": False, "signature": None, "error": str(e)}
+
+    except Exception as e:
+        return {"success": False, "signature": None, "error": str(e)}
+
+
+# ============================================================
+# BUY / SELL
+# ============================================================
+
+def buy_token(mint_address, sol_amount):
+    if not is_live_trading_enabled():
+        return {"success": False, "signature": None, "error": "Live trading disabled"}
+
+    wallet = load_wallet()
+    lamports = int(sol_amount * LAMPORTS_PER_SOL)
+
+    return jupiter_swap(SOL_MINT, mint_address, lamports, wallet)
+
+
+def sell_token(mint_address):
+    if not is_live_trading_enabled():
+        return {"success": False, "signature": None, "error": "Live trading disabled"}
+
+    wallet = load_wallet()
+
+    # get token balance
+    token_accounts = rpc_call("getTokenAccountsByOwner", [
+        str(wallet.pubkey()),
+        {"mint": mint_address},
+        {"encoding": "jsonParsed"}
+    ])
+
+    accounts = token_accounts["result"]["value"]
+    if not accounts:
+        return {"success": False, "signature": None, "error": "No tokens to sell"}
+
+    amount = int(accounts[0]["account"]["data"]["parsed"]["info"]["tokenAmount"]["amount"])
+
+    return jupiter_swap(mint_address, SOL_MINT, amount, wallet)
+
+
+# ============================================================
+# WALLET SUMMARY
+# ============================================================
+
+def get_wallet_summary():
+    try:
+        wallet = load_wallet()
+        balance_data = rpc_call("getBalance", [str(wallet.pubkey())])
+        balance = balance_data["result"]["value"] / LAMPORTS_PER_SOL
+
+        return {
+            "address": str(wallet.pubkey()),
+            "balance_sol": round(balance, 4),
+            "live_trading": is_live_trading_enabled(),
+            "max_per_trade": get_max_sol_per_trade(),
+        }
+
     except Exception as e:
         return {"error": str(e)}
-
-
-def buy_token(output_mint: str, sol_amount: float, slippage_bps: int = DEFAULT_SLIPPAGE_BPS) -> dict:
-    """
-    Buy `output_mint` spending `sol_amount` SOL.
-
-    Returns:
-      {"success": bool, "signature": str|None, "error": str|None}
-    """
-    try:
-        kp = _load_wallet()
-        user_pubkey = str(kp.pubkey())
-
-        bal = _sol_balance(user_pubkey)
-        if bal - sol_amount < MIN_SOL_RESERVE:
-            return {
-                "success": False,
-                "signature": None,
-                "error": f"Not enough SOL. Balance={bal:.4f}, requested={sol_amount:.4f}, reserve={MIN_SOL_RESERVE:.4f}",
-            }
-
-        lamports_in = int(sol_amount * LAMPORTS_PER_SOL)
-        last_err: Optional[str] = None
-
-        for attempt in range(1, MAX_RETRIES + 1):
-            try:
-                route = _get_quote_route(SOL_MINT, output_mint, lamports_in, slippage_bps)
-                swap_tx_b64 = _get_swap_tx(route, user_pubkey)
-
-                raw = base64.b64decode(swap_tx_b64)
-                vtx = VersionedTransaction.from_bytes(raw)
-
-                signed = VersionedTransaction(vtx.message, [kp])
-                signed_b64 = base64.b64encode(bytes(signed)).decode("utf-8")
-
-                sig = _send_raw_tx(signed_b64)
-                log.info(f"BUY sent: {sig} (attempt {attempt}/{MAX_RETRIES})")
-
-                if _confirm_sig(sig, CONFIRM_TIMEOUT):
-                    return {"success": True, "signature": sig, "error": None}
-
-                last_err = f"Sent but not confirmed after {CONFIRM_TIMEOUT}s (sig={sig})"
-                time.sleep(2 + attempt)
-            except requests.exceptions.HTTPError as he:
-                # Tighten HTTP errors for Telegram (e.g. 401 from old endpoints)
-                last_err = f"HTTP error: {str(he)[:200]}"
-                time.sleep(2 + attempt)
-            except Exception as e:
-                last_err = str(e)[:400]
-                time.sleep(2 + attempt)
-
-        return {"success": False, "signature": None, "error": last_err or "Unknown error"}
-
-    except Exception as e:
-        return {"success": False, "signature": None, "error": str(e)[:400]}
-
-
-def sell_token(input_mint: str, slippage_bps: int = DEFAULT_SLIPPAGE_BPS) -> dict:
-    """
-    Sell 100% of your balance of `input_mint` into SOL.
-
-    Returns:
-      {"success": bool, "signature": str|None, "error": str|None}
-    """
-    try:
-        kp = _load_wallet()
-        user_pubkey = str(kp.pubkey())
-
-        amount_raw, decimals = _get_token_balance_raw(user_pubkey, input_mint)
-        if amount_raw <= 0:
-            return {"success": False, "signature": None, "error": f"No token balance found for mint {input_mint}"}
-
-        last_err: Optional[str] = None
-
-        for attempt in range(1, MAX_RETRIES + 1):
-            try:
-                route = _get_quote_route(input_mint, SOL_MINT, amount_raw, slippage_bps)
-                swap_tx_b64 = _get_swap_tx(route, user_pubkey)
-
-                raw = base64.b64decode(swap_tx_b64)
-                vtx = VersionedTransaction.from_bytes(raw)
-
-                signed = VersionedTransaction(vtx.message, [kp])
-                signed_b64 = base64.b64encode(bytes(signed)).decode("utf-8")
-
-                sig = _send_raw_tx(signed_b64)
-                log.info(f"SELL sent: {sig} (attempt {attempt}/{MAX_RETRIES})")
-
-                if _confirm_sig(sig, CONFIRM_TIMEOUT):
-                    return {"success": True, "signature": sig, "error": None}
-
-                last_err = f"Sent but not confirmed after {CONFIRM_TIMEOUT}s (sig={sig})"
-                time.sleep(2 + attempt)
-
-            except Exception as e:
-                last_err = str(e)[:400]
-                time.sleep(2 + attempt)
-
-        return {"success": False, "signature": None, "error": last_err or "Unknown error"}
-
-    except Exception as e:
-        return {"success": False, "signature": None, "error": str(e)[:400]}
