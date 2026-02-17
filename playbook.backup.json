@@ -139,58 +139,18 @@
     {
       "date": "2026-02-17",
       "note": "Buy-ratio > 1.0 is a good indicator of buying pressure"
+    },
+    {
+      "date": "2026-02-17",
+      "note": "Volume spikes >2.5\u00d7 are almost always losers \u2013 keep them out."
+    },
+    {
+      "date": "2026-02-17",
+      "note": "Buy\u2011ratio 1\u20113.5 + whale net\u2011buy >1% = strong confidence boost."
     }
   ],
-  "scans": 73,
+  "scans": 74,
   "tokens_seen": [
-    {
-      "name": "What if (IF)",
-      "date": "2026-02-17T06:51"
-    },
-    {
-      "name": "Essence Of Time (Time)",
-      "date": "2026-02-17T06:51"
-    },
-    {
-      "name": "SAVE (SAVE)",
-      "date": "2026-02-17T06:51"
-    },
-    {
-      "name": "b\u01d0ngw\u01d4 (\u4e19\u5348)",
-      "date": "2026-02-17T06:51"
-    },
-    {
-      "name": "FORESKIN (FORESKIN)",
-      "date": "2026-02-17T06:51"
-    },
-    {
-      "name": "MELON MUSK (MELON)",
-      "date": "2026-02-17T06:51"
-    },
-    {
-      "name": "MUNCHKIN (MUNCHKIN)",
-      "date": "2026-02-17T06:51"
-    },
-    {
-      "name": "Trenches Game (TRENCH)",
-      "date": "2026-02-17T06:51"
-    },
-    {
-      "name": "firewu (FIREWU)",
-      "date": "2026-02-17T06:59"
-    },
-    {
-      "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
-      "date": "2026-02-17T06:59"
-    },
-    {
-      "name": "Preguntale (Preguntale)",
-      "date": "2026-02-17T06:59"
-    },
-    {
-      "name": "Frog CEO (FROGCEO)",
-      "date": "2026-02-17T06:59"
-    },
     {
       "name": "What if (IF)",
       "date": "2026-02-17T06:59"
@@ -942,100 +902,58 @@
     {
       "name": "Trenches Game (TRENCH)",
       "date": "2026-02-17T15:19"
+    },
+    {
+      "name": "firewu (FIREWU)",
+      "date": "2026-02-17T15:32"
+    },
+    {
+      "name": "Drippin (Drippin)",
+      "date": "2026-02-17T15:32"
+    },
+    {
+      "name": "What if (IF)",
+      "date": "2026-02-17T15:32"
+    },
+    {
+      "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
+      "date": "2026-02-17T15:32"
+    },
+    {
+      "name": "Preguntale (Preguntale)",
+      "date": "2026-02-17T15:32"
+    },
+    {
+      "name": "SAVE (SAVE)",
+      "date": "2026-02-17T15:32"
+    },
+    {
+      "name": "b\u01d0ngw\u01d4 (\u4e19\u5348)",
+      "date": "2026-02-17T15:32"
+    },
+    {
+      "name": "Grok Agents (Agents)",
+      "date": "2026-02-17T15:32"
+    },
+    {
+      "name": "FORESKIN (FORESKIN)",
+      "date": "2026-02-17T15:32"
+    },
+    {
+      "name": "Honke (Honke)",
+      "date": "2026-02-17T15:32"
+    },
+    {
+      "name": "MELON MUSK (MELON)",
+      "date": "2026-02-17T15:32"
+    },
+    {
+      "name": "Trenches Game (TRENCH)",
+      "date": "2026-02-17T15:32"
     }
   ],
-  "last_scan": "2026-02-17T15:19",
+  "last_scan": "2026-02-17T15:32",
   "active_picks": [
-    {
-      "name": "MUNCHKIN",
-      "symbol": "MUNCHKIN",
-      "contract": "4EmCYV1vn5X27jiLA5sWDhPMZWH5AWKzwjnCS2Atpump",
-      "entry_price": 8.199e-05,
-      "confidence": 7,
-      "reason": "Micro\u2011cap, 15h age, massive buy ratio >12, 1.34x volume spike, heavy whale accumulation",
-      "picked_at": "2026-02-17T14:38",
-      "scans_tracked": 6,
-      "peak_price": 8.199e-05,
-      "lowest_price": 1.689e-06,
-      "entry_snapshot": {
-        "market_cap": 81994.0,
-        "mc_tier": "micro (<100k)",
-        "liquidity": 22404.14,
-        "liq_to_mc_ratio": 0.2732,
-        "volume_1h": 7462.9,
-        "volume_24h": 133498.17,
-        "vol_spike": 1.34,
-        "vol_tier": "normal",
-        "buy_ratio_1h": 12.41,
-        "pressure_tier": "heavy_buying",
-        "price_change_1h": 16.38,
-        "price_change_6h": 8.4,
-        "price_change_24h": 126.0,
-        "dex": "pumpswap",
-        "hours_old": 15.1,
-        "source": "scan"
-      }
-    },
-    {
-      "name": "\u30c6\u30c7\u30a3\u30d9\u30a2",
-      "symbol": "TEDDY",
-      "contract": "AdJSR8QaustnW2MupTy6TqzHWMmd8AVqgWE27VKtpump",
-      "entry_price": 5.467e-06,
-      "confidence": 6,
-      "reason": "Micro\u2011cap, 23h age, decent buy ratio 1.25, very low market cap, potential for large upside",
-      "picked_at": "2026-02-17T14:38",
-      "scans_tracked": 6,
-      "peak_price": 5.467e-06,
-      "lowest_price": 4.964e-06,
-      "entry_snapshot": {
-        "market_cap": 5468.0,
-        "mc_tier": "micro (<100k)",
-        "liquidity": 5943.55,
-        "liq_to_mc_ratio": 1.087,
-        "volume_1h": 750.32,
-        "volume_24h": 464574.35,
-        "vol_spike": 0.04,
-        "vol_tier": "normal",
-        "buy_ratio_1h": 1.25,
-        "pressure_tier": "balanced",
-        "price_change_1h": 4.54,
-        "price_change_6h": -56.98,
-        "price_change_24h": -84.38,
-        "dex": "pumpswap",
-        "hours_old": 23.1,
-        "source": "scan"
-      }
-    },
-    {
-      "name": "FORESKIN",
-      "symbol": "FORESKIN",
-      "contract": "Dr5YqYNJxT2W644nAwN2K54wXj3qtGkpR6AmaKJ6pump",
-      "entry_price": 4.683e-05,
-      "confidence": 8,
-      "reason": "Micro\u2011cap $45k, age 16h, moderate 1.9x volume spike, buy ratio 1.73, strong whale pressure, solid liquidity",
-      "picked_at": "2026-02-17T14:43",
-      "scans_tracked": 5,
-      "peak_price": 4.801e-05,
-      "lowest_price": 4.683e-05,
-      "entry_snapshot": {
-        "market_cap": 45144.0,
-        "mc_tier": "micro (<100k)",
-        "liquidity": 16746.78,
-        "liq_to_mc_ratio": 0.371,
-        "volume_1h": 6083.3,
-        "volume_24h": 75961.17,
-        "vol_spike": 1.92,
-        "vol_tier": "moderate",
-        "buy_ratio_1h": 1.74,
-        "pressure_tier": "strong_buying",
-        "price_change_1h": -22.12,
-        "price_change_6h": -23.88,
-        "price_change_24h": 29.66,
-        "dex": "pumpswap",
-        "hours_old": 16.2,
-        "source": "scan"
-      }
-    },
     {
       "name": "\u30c6\u30c7\u30a3\u30d9\u30a2",
       "symbol": "TEDDY",
@@ -1044,7 +962,7 @@
       "confidence": 6,
       "reason": "Very low market cap $5.4k, age 23h, buy ratio >1, decent 24h buy\u2011sell ratio, low volume spike suggests room for activity",
       "picked_at": "2026-02-17T14:43",
-      "scans_tracked": 5,
+      "scans_tracked": 6,
       "peak_price": 5.379e-06,
       "lowest_price": 4.964e-06,
       "entry_snapshot": {
@@ -1074,7 +992,7 @@
       "confidence": 5,
       "reason": "Micro\u2011cap $23k, buy ratio 1.17, low 0.24x volume spike, age >24h but still under $100k cap, potential upside if volume picks up",
       "picked_at": "2026-02-17T14:43",
-      "scans_tracked": 5,
+      "scans_tracked": 6,
       "peak_price": 2.365e-05,
       "lowest_price": 2.099e-05,
       "entry_snapshot": {
@@ -1104,7 +1022,7 @@
       "confidence": 8,
       "reason": "Micro\u2011cap, 16h age, buy ratio 1.77, moderate volume spike (1.55x), positive 1h change (+5%), strong whale buy pressure",
       "picked_at": "2026-02-17T14:49",
-      "scans_tracked": 4,
+      "scans_tracked": 5,
       "peak_price": 4.801e-05,
       "lowest_price": 4.776e-05,
       "entry_snapshot": {
@@ -1134,8 +1052,8 @@
       "confidence": 7,
       "reason": "18h age, buy ratio 1.37 with huge 24h buy dominance, normal volume (1.6x), modest 1h gain (+0.63%), whale accumulation",
       "picked_at": "2026-02-17T14:49",
-      "scans_tracked": 4,
-      "peak_price": 0.000463,
+      "scans_tracked": 5,
+      "peak_price": 0.0004637,
       "lowest_price": 0.0004508,
       "entry_snapshot": {
         "market_cap": 140409.0,
@@ -1164,9 +1082,9 @@
       "confidence": 5,
       "reason": "Very high 1h gain (+179%) and buy ratio 1.77, but extreme volume spike (7.19x) lowers confidence",
       "picked_at": "2026-02-17T14:49",
-      "scans_tracked": 4,
+      "scans_tracked": 5,
       "peak_price": 3.677e-05,
-      "lowest_price": 2.51e-05,
+      "lowest_price": 2.284e-05,
       "entry_snapshot": {
         "market_cap": 26026.61,
         "mc_tier": "micro (<100k)",
@@ -1194,8 +1112,8 @@
       "confidence": 8,
       "reason": "Age 18h (optimal), normal volume spike (1.65x), buy\u2011ratio 1.37, strong whale accumulation, solid liquidity",
       "picked_at": "2026-02-17T14:54",
-      "scans_tracked": 3,
-      "peak_price": 0.000463,
+      "scans_tracked": 4,
+      "peak_price": 0.0004637,
       "lowest_price": 0.0004508,
       "entry_snapshot": {
         "market_cap": 140087.0,
@@ -1224,7 +1142,7 @@
       "confidence": 7,
       "reason": "Age 16h, volume spike 1.51x, buy\u2011ratio 2.6 within safe range, strong whale buy pressure, good liquidity",
       "picked_at": "2026-02-17T14:54",
-      "scans_tracked": 3,
+      "scans_tracked": 4,
       "peak_price": 4.801e-05,
       "lowest_price": 4.776e-05,
       "entry_snapshot": {
@@ -1254,8 +1172,8 @@
       "confidence": 7,
       "reason": "Age 10h, volume spike ~1x (normal), buy\u2011ratio 1.31, decent liquidity, fits winning criteria",
       "picked_at": "2026-02-17T14:54",
-      "scans_tracked": 3,
-      "peak_price": 0.0004956,
+      "scans_tracked": 4,
+      "peak_price": 0.0005166,
       "lowest_price": 0.0003467,
       "entry_snapshot": {
         "market_cap": 348106.0,
@@ -1284,7 +1202,7 @@
       "confidence": 7,
       "reason": "Age 16h (optimal), moderate volume spike 1.48x, buy\u2011ratio 2.59 within target range, strong whale buy pressure, low MC and good liquidity.",
       "picked_at": "2026-02-17T15:05",
-      "scans_tracked": 2,
+      "scans_tracked": 3,
       "peak_price": 4.801e-05,
       "lowest_price": 4.781e-05,
       "entry_snapshot": {
@@ -1314,8 +1232,8 @@
       "confidence": 6,
       "reason": "Age 19h, volume spike 1.74x (normal), buy\u2011ratio 1.37, whale accumulation noted, modest market cap and solid liquidity.",
       "picked_at": "2026-02-17T15:05",
-      "scans_tracked": 2,
-      "peak_price": 0.000463,
+      "scans_tracked": 3,
+      "peak_price": 0.0004637,
       "lowest_price": 0.0004613,
       "entry_snapshot": {
         "market_cap": 143869.0,
@@ -1344,8 +1262,8 @@
       "confidence": 5,
       "reason": "Age 10h, low volume spike 0.88x, buy\u2011ratio 1.31, healthy liquidity, no red\u2011flag spikes, suitable for 2\u201110x upside.",
       "picked_at": "2026-02-17T15:05",
-      "scans_tracked": 2,
-      "peak_price": 0.0004956,
+      "scans_tracked": 3,
+      "peak_price": 0.0005166,
       "lowest_price": 0.0003467,
       "entry_snapshot": {
         "market_cap": 346726.0,
@@ -1374,8 +1292,8 @@
       "confidence": 9,
       "reason": "Age 19h, buy\u2011ratio 1.39, moderate volume spike 1.44\u00d7, strong whale accumulation and huge 24h buy ratio indicate strong upside",
       "picked_at": "2026-02-17T15:13",
-      "scans_tracked": 1,
-      "peak_price": 0.0004614,
+      "scans_tracked": 2,
+      "peak_price": 0.0004637,
       "lowest_price": 0.0004613,
       "entry_snapshot": {
         "market_cap": 143332.0,
@@ -1404,8 +1322,8 @@
       "confidence": 8,
       "reason": "Age 10h, buy\u2011ratio 1.3, low volume spike 0.85\u00d7, solid liquidity and steady buy pressure suggest 2\u201110\u00d7 potential",
       "picked_at": "2026-02-17T15:13",
-      "scans_tracked": 1,
-      "peak_price": 0.0004956,
+      "scans_tracked": 2,
+      "peak_price": 0.0005166,
       "lowest_price": 0.0004037,
       "entry_snapshot": {
         "market_cap": 403772.0,
@@ -1434,7 +1352,7 @@
       "confidence": 7,
       "reason": "Age 16h, buy\u2011ratio 1.76, volume spike 1.43\u00d7, strong whale buy pressure and decent liquidity make it a good candidate",
       "picked_at": "2026-02-17T15:13",
-      "scans_tracked": 1,
+      "scans_tracked": 2,
       "peak_price": 4.801e-05,
       "lowest_price": 4.791e-05,
       "entry_snapshot": {
@@ -1464,8 +1382,8 @@
       "confidence": 8,
       "reason": "Age 10h (optimal), buy\u2011ratio 1.27, low volume spike 1.03\u00d7, normal volume and solid upside potential",
       "picked_at": "2026-02-17T15:19",
-      "scans_tracked": 0,
-      "peak_price": 0.0004798,
+      "scans_tracked": 1,
+      "peak_price": 0.0005166,
       "lowest_price": 0.0004798,
       "entry_snapshot": {
         "market_cap": 479804.0,
@@ -1494,8 +1412,8 @@
       "confidence": 7,
       "reason": "Age 19h, buy\u2011ratio 1.4, modest volume spike 1.21\u00d7, whale accumulation indicating strong buying pressure",
       "picked_at": "2026-02-17T15:19",
-      "scans_tracked": 0,
-      "peak_price": 0.0004614,
+      "scans_tracked": 1,
+      "peak_price": 0.0004637,
       "lowest_price": 0.0004614,
       "entry_snapshot": {
         "market_cap": 143389.0,
@@ -1524,7 +1442,7 @@
       "confidence": 6,
       "reason": "Age 16h, buy\u2011ratio 1.76, volume spike 1.38\u00d7, strong whale buy pressure, fits 2\u201110\u00d7 upside profile",
       "picked_at": "2026-02-17T15:19",
-      "scans_tracked": 0,
+      "scans_tracked": 1,
       "peak_price": 4.791e-05,
       "lowest_price": 4.791e-05,
       "entry_snapshot": {
@@ -1543,6 +1461,96 @@
         "price_change_24h": 32.93,
         "dex": "pumpswap",
         "hours_old": 16.8,
+        "source": "scan"
+      }
+    },
+    {
+      "name": "FORESKIN",
+      "symbol": "FORESKIN",
+      "contract": "Dr5YqYNJxT2W644nAwN2K54wXj3qtGkpR6AmaKJ6pump",
+      "entry_price": 4.791e-05,
+      "confidence": 8,
+      "reason": "Age 17h, low volume spike (1.05x), strong buy\u2011ratio 1.76, whale buy pressure, low market cap suggests 2\u201110x upside",
+      "picked_at": "2026-02-17T15:32",
+      "scans_tracked": 0,
+      "peak_price": 4.791e-05,
+      "lowest_price": 4.791e-05,
+      "entry_snapshot": {
+        "market_cap": 46285.0,
+        "mc_tier": "micro (<100k)",
+        "liquidity": 16916.43,
+        "liq_to_mc_ratio": 0.3655,
+        "volume_1h": 3416.21,
+        "volume_24h": 78329.19,
+        "vol_spike": 1.05,
+        "vol_tier": "normal",
+        "buy_ratio_1h": 1.76,
+        "pressure_tier": "strong_buying",
+        "price_change_1h": 5.03,
+        "price_change_6h": -22.15,
+        "price_change_24h": 32.93,
+        "dex": "pumpswap",
+        "hours_old": 17.0,
+        "source": "scan"
+      }
+    },
+    {
+      "name": "SAVE",
+      "symbol": "SAVE",
+      "contract": "5TwPKDtb1xhLDCrDqyCJgK6b1tt8LFuucTu8nh6J1UyB",
+      "entry_price": 0.0004637,
+      "confidence": 7,
+      "reason": "Age 19h, normal volume spike (0.96x), solid buy\u2011ratio 1.39, whale accumulation noted, moderate cap offers room for multi\u2011x gain",
+      "picked_at": "2026-02-17T15:32",
+      "scans_tracked": 0,
+      "peak_price": 0.0004637,
+      "lowest_price": 0.0004637,
+      "entry_snapshot": {
+        "market_cap": 144081.0,
+        "mc_tier": "small (100k-500k)",
+        "liquidity": 55773.21,
+        "liq_to_mc_ratio": 0.3871,
+        "volume_1h": 17935.1,
+        "volume_24h": 448606.35,
+        "vol_spike": 0.96,
+        "vol_tier": "normal",
+        "buy_ratio_1h": 1.39,
+        "pressure_tier": "balanced",
+        "price_change_1h": -4.41,
+        "price_change_6h": 25.08,
+        "price_change_24h": 174.0,
+        "dex": "meteora",
+        "hours_old": 19.5,
+        "source": "scan"
+      }
+    },
+    {
+      "name": "Preguntale",
+      "symbol": "Preguntale",
+      "contract": "57KoEZXm2mJwFqbB7fvcgZmmjc9mivFmKhXA45H3pump",
+      "entry_price": 0.0004435,
+      "confidence": 6,
+      "reason": "Buy\u2011ratio 1.53, low volume spike (0.64x), strong whale buy pressure, sub\u2011$1M market cap; fits winning profile for 2\u201110x potential",
+      "picked_at": "2026-02-17T15:32",
+      "scans_tracked": 0,
+      "peak_price": 0.0004435,
+      "lowest_price": 0.0004435,
+      "entry_snapshot": {
+        "market_cap": 443470.0,
+        "mc_tier": "small (100k-500k)",
+        "liquidity": 71403.58,
+        "liq_to_mc_ratio": 0.161,
+        "volume_1h": 117768.81,
+        "volume_24h": 4444463.2,
+        "vol_spike": 0.64,
+        "vol_tier": "normal",
+        "buy_ratio_1h": 1.53,
+        "pressure_tier": "strong_buying",
+        "price_change_1h": -10.31,
+        "price_change_6h": 20.99,
+        "price_change_24h": 836.0,
+        "dex": "pumpswap",
+        "hours_old": 171.8,
         "source": "scan"
       }
     }
@@ -2690,7 +2698,6 @@
     "Consider age 1\u20116\u202fh for high upside; this segment (4 trades) yields an average ROI of +1198.5\u202f% despite a lower win rate (25\u202f%)."
   ],
   "avoid_conditions": [
-    "AVOID tokens already pumped >100% in 1h (lost -29.8% on \u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY))",
     "AVOID tokens with liq/MC ratio <5% (thin liquidity trap, lost on ORGAZM)",
     "AVOID tokens with sell pressure (ratio <1.0) (lost -27.9% on Punch\u2019s Father)",
     "AVOID tokens with sell pressure (ratio <1.0) (lost -19.2% on Punch\u2019s Father)",
@@ -2709,7 +2716,8 @@
     "If token age <6h, automatically downgrade confidence by 2 points and cap position to \u22640.5% of portfolio.",
     "Confirm whale net-buy >1% of supply to justify >2.5\u00d7 volume spikes",
     "Cap IF\u2019s position at 0.5% for low-volume spike tokens",
-    "Consider tokens with buy-ratio > 1.5 for higher upside potential"
+    "Consider tokens with buy-ratio > 1.5 for higher upside potential",
+    "If a token shows a 24h price surge >500% and buy\u2011ratio >1.4, increase confidence by +1."
   ],
   "mistake_log": [
     {
@@ -4090,18 +4098,11 @@
       "confidence": 8,
       "reason": "Strong buy pressure, Vol spike 3.96x",
       "opened_at": "2026-02-16T18:46",
-      "last_update": "2026-02-17T15:19",
+      "last_update": "2026-02-17T15:32",
       "peak_price": 8.095206999999999e-06,
       "lowest_price": 6.983e-06,
-      "scans_monitored": 61,
+      "scans_monitored": 62,
       "updates": [
-        {
-          "scan": 42,
-          "price": 7.527e-06,
-          "action": "HOLD",
-          "reason": "Monitoring (-7.0%)",
-          "time": "2026-02-17T05:37"
-        },
         {
           "scan": 43,
           "price": 7.527e-06,
@@ -4234,6 +4235,13 @@
           "action": "HOLD",
           "reason": "Monitoring (-9.2%)",
           "time": "2026-02-17T15:19"
+        },
+        {
+          "scan": 62,
+          "price": 7.348e-06,
+          "action": "HOLD",
+          "reason": "Monitoring (-9.2%)",
+          "time": "2026-02-17T15:32"
         }
       ],
       "entry_snapshot": {
@@ -4278,10 +4286,10 @@
       "confidence": 8,
       "reason": "Low market cap, high buy ratio, and heavy buy pressure",
       "opened_at": "2026-02-17T06:31",
-      "last_update": "2026-02-17T15:19",
+      "last_update": "2026-02-17T15:32",
       "peak_price": 2.556e-05,
       "lowest_price": 1.451e-05,
-      "scans_monitored": 18,
+      "scans_monitored": 19,
       "updates": [
         {
           "scan": 1,
@@ -4408,6 +4416,13 @@
           "action": "HOLD",
           "reason": "Monitoring (+58.4%)",
           "time": "2026-02-17T15:19"
+        },
+        {
+          "scan": 19,
+          "price": 2.371e-05,
+          "action": "HOLD",
+          "reason": "Monitoring (+61.2%)",
+          "time": "2026-02-17T15:32"
         }
       ],
       "entry_snapshot": {
@@ -4457,10 +4472,10 @@
       "confidence": 8,
       "reason": "Micro\u2011cap, 16h age, buy ratio 1.71, moderate 1.84x volume spike, strong whale buy pressure",
       "opened_at": "2026-02-17T14:43",
-      "last_update": "2026-02-17T15:19",
+      "last_update": "2026-02-17T15:32",
       "peak_price": 4.801e-05,
       "lowest_price": 4.7181225e-05,
-      "scans_monitored": 5,
+      "scans_monitored": 6,
       "updates": [
         {
           "scan": 1,
@@ -4496,6 +4511,13 @@
           "action": "HOLD",
           "reason": "Monitoring (+1.5%)",
           "time": "2026-02-17T15:19"
+        },
+        {
+          "scan": 6,
+          "price": 4.791e-05,
+          "action": "HOLD",
+          "reason": "Monitoring (+1.5%)",
+          "time": "2026-02-17T15:32"
         }
       ],
       "entry_snapshot": {
