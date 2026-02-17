@@ -954,11 +954,12 @@ _last_groq_error = ""  # Stores last Groq error for Telegram reporting
 
 # Model fallback chain - if one hits rate limit, try the next
 # Each model has its own separate daily token limit on Groq free tier
+# Updated Feb 2026 - removed decommissioned models
 GROQ_MODEL_CHAIN = [
     "llama-3.3-70b-versatile",    # Best quality (primary)
-    "llama-3.1-70b-versatile",    # Similar quality (fallback 1)
-    "llama3-70b-8192",            # Older but solid (fallback 2)
-    "mixtral-8x7b-32768",         # Different architecture (fallback 3)
+    "openai/gpt-oss-120b",        # OpenAI open-weight MoE 120B (fallback 1)
+    "qwen/qwen3-32b",             # Qwen3 32B - strong reasoning (fallback 2)
+    "openai/gpt-oss-20b",         # OpenAI open-weight 20B - fast (fallback 3)
     "llama-3.1-8b-instant",       # Smaller but fast (last resort)
 ]
 
