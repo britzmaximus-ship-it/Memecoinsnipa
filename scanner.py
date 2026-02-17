@@ -952,48 +952,82 @@ Not financial advice."""
 
 _last_groq_error = ""  # Stores last Groq error for Telegram reporting
 
+# Model fallback chain - if one hits rate limit, try the next
+# Each model has its own separate daily token limit on Groq free tier
+GROQ_MODEL_CHAIN = [
+    "llama-3.3-70b-versatile",    # Best quality (primary)
+    "llama-3.1-70b-versatile",    # Similar quality (fallback 1)
+    "llama3-70b-8192",            # Older but solid (fallback 2)
+    "mixtral-8x7b-32768",         # Different architecture (fallback 3)
+    "llama-3.1-8b-instant",       # Smaller but fast (last resort)
+]
+
 def call_groq(system: str, prompt: str, temperature: float = 0.8,
               timeout: int = GROQ_TIMEOUT_STAGE1, max_tokens: int = GROQ_MAX_TOKENS_STAGE2) -> Optional[str]:
-    """Call Groq API with the given system/user messages."""
+    """Call Groq API with model fallback chain. If a model hits rate limit (429),
+    automatically tries the next model in the chain."""
     global _last_groq_error
     prompt_len = len(system) + len(prompt)
     log.info(f"Groq call: prompt_len={prompt_len}, max_tokens={max_tokens}, timeout={timeout}s")
-    try:
-        resp = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {GROQ_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": "llama-3.3-70b-versatile",
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": prompt},
-                ],
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-            },
-            timeout=timeout,
-        )
-        if resp.status_code != 200:
-            _last_groq_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
-            log.error(f"Groq API error: {_last_groq_error}")
+
+    errors = []
+    for model in GROQ_MODEL_CHAIN:
+        try:
+            log.info(f"Trying model: {model}")
+            resp = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {GROQ_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": prompt},
+                    ],
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                },
+                timeout=timeout,
+            )
+
+            # Rate limited - try next model
+            if resp.status_code == 429:
+                err = f"{model}: rate limited"
+                log.warning(f"Groq {err}, trying next model...")
+                errors.append(err)
+                continue
+
+            # Other HTTP error - don't retry, it's likely a real problem
+            if resp.status_code != 200:
+                _last_groq_error = f"{model} HTTP {resp.status_code}: {resp.text[:200]}"
+                log.error(f"Groq API error: {_last_groq_error}")
+                return None
+
+            result = resp.json()
+            content = result["choices"][0]["message"]["content"]
+            if model != GROQ_MODEL_CHAIN[0]:
+                log.info(f"Fallback model {model} succeeded")
+            return content
+
+        except requests.exceptions.Timeout:
+            _last_groq_error = f"{model}: Timeout after {timeout}s (prompt_len={prompt_len})"
+            log.error(f"Groq API: {_last_groq_error}")
             return None
-        result = resp.json()
-        return result["choices"][0]["message"]["content"]
-    except requests.exceptions.Timeout:
-        _last_groq_error = f"Timeout after {timeout}s (prompt_len={prompt_len})"
-        log.error(f"Groq API: {_last_groq_error}")
-        return None
-    except requests.exceptions.RequestException as e:
-        _last_groq_error = f"Request failed: {str(e)[:200]}"
-        log.error(f"Groq API: {_last_groq_error}")
-        return None
-    except (KeyError, IndexError) as e:
-        _last_groq_error = f"Bad response format: {str(e)[:200]}"
-        log.error(f"Groq API: {_last_groq_error}")
-        return None
+        except requests.exceptions.RequestException as e:
+            _last_groq_error = f"{model}: Request failed: {str(e)[:200]}"
+            log.error(f"Groq API: {_last_groq_error}")
+            return None
+        except (KeyError, IndexError) as e:
+            _last_groq_error = f"{model}: Bad response format: {str(e)[:200]}"
+            log.error(f"Groq API: {_last_groq_error}")
+            return None
+
+    # All models rate limited
+    _last_groq_error = f"All models rate limited: {', '.join(errors)}"
+    log.error(f"Groq API: {_last_groq_error}")
+    return None
 
 
 # ============================================================
