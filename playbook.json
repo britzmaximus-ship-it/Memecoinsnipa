@@ -41,56 +41,8 @@
       "note": "**\n\n* ADDED: Prioritize tokens with strong buy pressure and whale accumulation.\n* MODIFIED: Be more cautious with tokens that have similar patterns to past losing picks.\n* REMOVED: None\n\n**"
     }
   ],
-  "scans": 44,
+  "scans": 45,
   "tokens_seen": [
-    {
-      "name": "\u30de\u30de\u30f3 (Maman)",
-      "date": "2026-02-16T22:48"
-    },
-    {
-      "name": "ORGAZM (ORGAZM)",
-      "date": "2026-02-16T22:48"
-    },
-    {
-      "name": "Mog Coin (MOG)",
-      "date": "2026-02-16T22:48"
-    },
-    {
-      "name": "Preguntale (Preguntale)",
-      "date": "2026-02-16T22:48"
-    },
-    {
-      "name": "Wealth Mogging (WEALTHMOG)",
-      "date": "2026-02-16T22:48"
-    },
-    {
-      "name": "SAVE (SAVE)",
-      "date": "2026-02-16T22:48"
-    },
-    {
-      "name": "Trenches Game (TRENCH)",
-      "date": "2026-02-16T22:48"
-    },
-    {
-      "name": "\u30d4\u30fc\u30bf\u3055\u3093 (PETAH)",
-      "date": "2026-02-16T22:48"
-    },
-    {
-      "name": "Punch\u2019s Father (KOSUKE)",
-      "date": "2026-02-16T22:49"
-    },
-    {
-      "name": "Clavicular (Clav)",
-      "date": "2026-02-16T22:49"
-    },
-    {
-      "name": "firewu (FIREWU)",
-      "date": "2026-02-16T22:49"
-    },
-    {
-      "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
-      "date": "2026-02-16T22:49"
-    },
     {
       "name": "\u30de\u30de\u30f3 (Maman)",
       "date": "2026-02-16T22:49"
@@ -842,9 +794,57 @@
     {
       "name": "MUNCHKIN (MUNCHKIN)",
       "date": "2026-02-17T04:18"
+    },
+    {
+      "name": "Clavicular (Clav)",
+      "date": "2026-02-17T04:19"
+    },
+    {
+      "name": "firewu (FIREWU)",
+      "date": "2026-02-17T04:19"
+    },
+    {
+      "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
+      "date": "2026-02-17T04:19"
+    },
+    {
+      "name": "Preguntale (Preguntale)",
+      "date": "2026-02-17T04:19"
+    },
+    {
+      "name": "Frog CEO (FROGCEO)",
+      "date": "2026-02-17T04:19"
+    },
+    {
+      "name": "Essence Of Time (Time)",
+      "date": "2026-02-17T04:19"
+    },
+    {
+      "name": "Mog Coin (MOG)",
+      "date": "2026-02-17T04:19"
+    },
+    {
+      "name": "ORGAZM (ORGAZM)",
+      "date": "2026-02-17T04:19"
+    },
+    {
+      "name": "SAVE (SAVE)",
+      "date": "2026-02-17T04:19"
+    },
+    {
+      "name": "b\u01d0ngw\u01d4 (\u4e19\u5348)",
+      "date": "2026-02-17T04:19"
+    },
+    {
+      "name": "MELON MUSK (MELON)",
+      "date": "2026-02-17T04:19"
+    },
+    {
+      "name": "MUNCHKIN (MUNCHKIN)",
+      "date": "2026-02-17T04:19"
     }
   ],
-  "last_scan": "2026-02-17T04:18",
+  "last_scan": "2026-02-17T04:19",
   "active_picks": [
     {
       "name": "Mog Coin",
@@ -854,7 +854,7 @@
       "confidence": 8,
       "reason": "Moderate buy pressure, high buy ratio, and low market cap",
       "picked_at": "2026-02-17T00:13",
-      "scans_tracked": 10,
+      "scans_tracked": 11,
       "peak_price": 0.0009519,
       "lowest_price": 0.0005217,
       "entry_snapshot": {
@@ -884,7 +884,7 @@
       "confidence": 7,
       "reason": "Low market cap, moderate buy pressure, and recent listing",
       "picked_at": "2026-02-17T00:13",
-      "scans_tracked": 10,
+      "scans_tracked": 11,
       "peak_price": 0.0003713,
       "lowest_price": 5.997e-06,
       "entry_snapshot": {
@@ -914,7 +914,7 @@
       "confidence": 6,
       "reason": "Low market cap, recent listing, and potential for growth",
       "picked_at": "2026-02-17T00:13",
-      "scans_tracked": 10,
+      "scans_tracked": 11,
       "peak_price": 7.803e-06,
       "lowest_price": 6.551e-06,
       "entry_snapshot": {
@@ -3112,18 +3112,11 @@
       "confidence": 8,
       "reason": "Strong buy pressure, Vol spike 3.96x",
       "opened_at": "2026-02-16T18:46",
-      "last_update": "2026-02-17T04:17",
+      "last_update": "2026-02-17T04:19",
       "peak_price": 8.095206999999999e-06,
       "lowest_price": 6.983e-06,
-      "scans_monitored": 32,
+      "scans_monitored": 33,
       "updates": [
-        {
-          "scan": 13,
-          "price": 6.983e-06,
-          "action": "HOLD",
-          "reason": "Monitoring (-13.7%)",
-          "time": "2026-02-16T21:03"
-        },
         {
           "scan": 14,
           "price": 6.983e-06,
@@ -3256,6 +3249,13 @@
           "action": "HOLD",
           "reason": "Monitoring (-7.0%)",
           "time": "2026-02-17T04:17"
+        },
+        {
+          "scan": 33,
+          "price": 7.527e-06,
+          "action": "HOLD",
+          "reason": "Monitoring (-7.0%)",
+          "time": "2026-02-17T04:19"
         }
       ],
       "entry_snapshot": {
@@ -3300,10 +3300,10 @@
       "confidence": 8,
       "reason": "Moderate buy pressure, low volume spike, and high buy ratio",
       "opened_at": "2026-02-16T21:58",
-      "last_update": "2026-02-17T04:17",
+      "last_update": "2026-02-17T04:19",
       "peak_price": 5.6127173e-06,
       "lowest_price": 4.357e-06,
-      "scans_monitored": 17,
+      "scans_monitored": 18,
       "updates": [
         {
           "scan": 1,
@@ -3423,6 +3423,13 @@
           "action": "HOLD",
           "reason": "Monitoring (-21.6%)",
           "time": "2026-02-17T04:17"
+        },
+        {
+          "scan": 18,
+          "price": 4.403e-06,
+          "action": "HOLD",
+          "reason": "Monitoring (-21.6%)",
+          "time": "2026-02-17T04:19"
         }
       ],
       "entry_snapshot": {
@@ -3467,10 +3474,10 @@
       "confidence": 8,
       "reason": "Low market cap, moderate buy pressure, and no extreme volume spikes",
       "opened_at": "2026-02-16T22:49",
-      "last_update": "2026-02-17T04:17",
+      "last_update": "2026-02-17T04:19",
       "peak_price": 8.475588000000001e-06,
       "lowest_price": 6.551e-06,
-      "scans_monitored": 15,
+      "scans_monitored": 16,
       "updates": [
         {
           "scan": 1,
@@ -3576,6 +3583,13 @@
           "action": "HOLD",
           "reason": "Monitoring (-22.7%)",
           "time": "2026-02-17T04:17"
+        },
+        {
+          "scan": 16,
+          "price": 6.551e-06,
+          "action": "HOLD",
+          "reason": "Monitoring (-22.7%)",
+          "time": "2026-02-17T04:19"
         }
       ],
       "entry_snapshot": {
@@ -3688,7 +3702,7 @@
   },
   "paper_trade_id_counter": 5,
   "pending_paper_trades": [],
-  "last_update_id": 574228919,
+  "last_update_id": 574228920,
   "token_blacklist": {
     "8yyBAFFfCA4fKw1Ai1SExtSf6DmVckGGDT8XgHUopump": {
       "name": "Mochi Panda",
