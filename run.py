@@ -9,8 +9,8 @@ import os
 import sys
 import time
 import logging
-import json
-from datetime import datetime
+import subprocess
+from datetime import datetime, timezone
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,37 +24,31 @@ SCAN_INTERVAL = int(os.environ.get("SCAN_INTERVAL_SECONDS", "120"))
 
 
 def run_scan():
-    """Run a single scan by importing and executing scanner.main()."""
-    # Re-import each time to pick up any module-level changes
-    import importlib
-    try:
-        import scanner
-        importlib.reload(scanner)
-    except EnvironmentError as e:
-        log.error(f"Scanner config error: {e}")
-        raise
-    except Exception as e:
-        log.error(f"Scanner import/run error: {e}")
-        raise
+    """Run scanner.py as a standalone script so __name__ == '__main__' works."""
+    result = subprocess.run(
+        [sys.executable, "scanner.py"],
+        timeout=300,  # 5 minute timeout per scan
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"Scanner exited with code {result.returncode}")
 
 
 if __name__ == "__main__":
-    log.info(f"=== Memecoinsnipa Runner Started ===")
-    log.info(f"Scan interval: {SCAN_INTERVAL}s ({SCAN_INTERVAL/60:.1f} min)")
-    log.info(f"Time: {datetime.utcnow().isoformat()}")
+    log.info("=== Memecoinsnipa Runner Started ===")
+    log.info(f"Scan interval: {SCAN_INTERVAL}s ({SCAN_INTERVAL / 60:.1f} min)")
+    log.info(f"Time: {datetime.now(timezone.utc).isoformat()}")
 
     consecutive_errors = 0
     MAX_CONSECUTIVE_ERRORS = 10
 
     while True:
         try:
-            log.info(f"--- Starting scan at {datetime.utcnow().isoformat()} ---")
+            log.info(f"--- Starting scan at {datetime.now(timezone.utc).isoformat()} ---")
             run_scan()
             consecutive_errors = 0
             log.info(f"--- Scan complete. Next scan in {SCAN_INTERVAL}s ---")
 
         except EnvironmentError as e:
-            # Missing env vars - fatal, don't retry
             log.error(f"FATAL config error: {e}")
             sys.exit(1)
 
@@ -66,7 +60,6 @@ if __name__ == "__main__":
                 log.error("Too many consecutive errors. Exiting.")
                 sys.exit(1)
 
-            # Back off on errors: wait longer
             backoff = min(SCAN_INTERVAL * consecutive_errors, 600)
             log.info(f"Backing off {backoff}s before retry...")
             time.sleep(backoff)
