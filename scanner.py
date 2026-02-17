@@ -41,7 +41,7 @@ MAX_TOKENS_PER_SCAN = 12               # Max tokens to fetch detailed data for
 MIN_MARKET_CAP = 5000                  # Skip tokens below this MC ($)
 
 # -- Paper trading --
-MAX_OPEN_PAPER_TRADES = 3              # Maximum simultaneous paper trades
+MAX_OPEN_PAPER_TRADES = 6              # Maximum simultaneous paper trades
 MAX_PENDING_TRADES = 5                 # Maximum pending confirmations
 MIN_CONFIDENCE_FOR_TRADE = 7           # Minimum AI confidence to queue a paper trade
 PRICE_DUMP_REJECT_PCT = -15            # Reject pending trade if price dumps more than this %
