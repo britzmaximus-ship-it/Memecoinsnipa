@@ -79,60 +79,24 @@
     {
       "date": "2026-02-17",
       "note": "Moderate volume spikes (1\u20112\u00d7) paired with balanced pressure give the highest ROI."
+    },
+    {
+      "date": "2026-02-17",
+      "note": "Micro-cap tokens with strong buy pressure and moderate volume spikes tend to perform well"
+    },
+    {
+      "date": "2026-02-17",
+      "note": "Young tokens with high market caps may increase risk level"
+    },
+    {
+      "date": "2026-02-17",
+      "note": "Low volume spikes can be a concern, but strong buy pressure and good liquidity can mitigate this risk"
     }
   ],
-  "scans": 65,
+  "scans": 66,
   "tokens_seen": [
     {
       "name": "Essence Of Time (Time)",
-      "date": "2026-02-17T04:24"
-    },
-    {
-      "name": "Mog Coin (MOG)",
-      "date": "2026-02-17T04:24"
-    },
-    {
-      "name": "ORGAZM (ORGAZM)",
-      "date": "2026-02-17T04:24"
-    },
-    {
-      "name": "SAVE (SAVE)",
-      "date": "2026-02-17T04:24"
-    },
-    {
-      "name": "b\u01d0ngw\u01d4 (\u4e19\u5348)",
-      "date": "2026-02-17T04:24"
-    },
-    {
-      "name": "MELON MUSK (MELON)",
-      "date": "2026-02-17T04:24"
-    },
-    {
-      "name": "MUNCHKIN (MUNCHKIN)",
-      "date": "2026-02-17T04:24"
-    },
-    {
-      "name": "FORESKIN (FORESKIN)",
-      "date": "2026-02-17T04:24"
-    },
-    {
-      "name": "firewu (FIREWU)",
-      "date": "2026-02-17T04:34"
-    },
-    {
-      "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
-      "date": "2026-02-17T04:34"
-    },
-    {
-      "name": "Preguntale (Preguntale)",
-      "date": "2026-02-17T04:34"
-    },
-    {
-      "name": "Frog CEO (FROGCEO)",
-      "date": "2026-02-17T04:34"
-    },
-    {
-      "name": "Essence Of Time (Time)",
       "date": "2026-02-17T04:34"
     },
     {
@@ -882,100 +846,58 @@
     {
       "name": "\u30de\u30de\u30f3 (Maman)",
       "date": "2026-02-17T13:50"
+    },
+    {
+      "name": "firewu (FIREWU)",
+      "date": "2026-02-17T14:34"
+    },
+    {
+      "name": "Drippin (Drippin)",
+      "date": "2026-02-17T14:34"
+    },
+    {
+      "name": "What if (IF)",
+      "date": "2026-02-17T14:34"
+    },
+    {
+      "name": "\u30c6\u30c7\u30a3\u30d9\u30a2 (TEDDY)",
+      "date": "2026-02-17T14:34"
+    },
+    {
+      "name": "Preguntale (Preguntale)",
+      "date": "2026-02-17T14:34"
+    },
+    {
+      "name": "SAVE (SAVE)",
+      "date": "2026-02-17T14:34"
+    },
+    {
+      "name": "b\u01d0ngw\u01d4 (\u4e19\u5348)",
+      "date": "2026-02-17T14:34"
+    },
+    {
+      "name": "Grok Agents (Agents)",
+      "date": "2026-02-17T14:34"
+    },
+    {
+      "name": "FORESKIN (FORESKIN)",
+      "date": "2026-02-17T14:34"
+    },
+    {
+      "name": "Honke (Honke)",
+      "date": "2026-02-17T14:34"
+    },
+    {
+      "name": "MELON MUSK (MELON)",
+      "date": "2026-02-17T14:34"
+    },
+    {
+      "name": "MUNCHKIN (MUNCHKIN)",
+      "date": "2026-02-17T14:34"
     }
   ],
-  "last_scan": "2026-02-17T13:51",
+  "last_scan": "2026-02-17T14:34",
   "active_picks": [
-    {
-      "name": "Essence Of Time",
-      "symbol": "Time",
-      "contract": "H8TjXYtF9m5wc3fhuRApkRgSe5wi2kK3F2ZwTLCNpump",
-      "entry_price": 1.276e-05,
-      "confidence": 7,
-      "reason": "New token, low market cap, and high buy ratio",
-      "picked_at": "2026-02-17T05:37",
-      "scans_tracked": 11,
-      "peak_price": 1.472e-05,
-      "lowest_price": 5.177e-06,
-      "entry_snapshot": {
-        "market_cap": 12730.0,
-        "mc_tier": "micro (<100k)",
-        "liquidity": 9411.94,
-        "liq_to_mc_ratio": 0.7394,
-        "volume_1h": 18542.28,
-        "volume_24h": 970120.1,
-        "vol_spike": 0.46,
-        "vol_tier": "normal",
-        "buy_ratio_1h": 1.22,
-        "pressure_tier": "balanced",
-        "price_change_1h": 32.49,
-        "price_change_6h": -76.56,
-        "price_change_24h": -64.65,
-        "dex": "pumpswap",
-        "hours_old": 6.5,
-        "source": "scan"
-      }
-    },
-    {
-      "name": "FORESKIN",
-      "symbol": "FORESKIN",
-      "contract": "Dr5YqYNJxT2W644nAwN2K54wXj3qtGkpR6AmaKJ6pump",
-      "entry_price": 4.853e-05,
-      "confidence": 6,
-      "reason": "New token, low market cap, and high buy ratio with heavy buy pressure",
-      "picked_at": "2026-02-17T05:37",
-      "scans_tracked": 11,
-      "peak_price": 6.387e-05,
-      "lowest_price": 4.499e-05,
-      "entry_snapshot": {
-        "market_cap": 46881.0,
-        "mc_tier": "micro (<100k)",
-        "liquidity": 17184.51,
-        "liq_to_mc_ratio": 0.3666,
-        "volume_1h": 4389.29,
-        "volume_24h": 48159.8,
-        "vol_spike": 2.19,
-        "vol_tier": "moderate",
-        "buy_ratio_1h": 2.56,
-        "pressure_tier": "heavy_buying",
-        "price_change_1h": 1.24,
-        "price_change_6h": 2.64,
-        "price_change_24h": 34.64,
-        "dex": "pumpswap",
-        "hours_old": 7.1,
-        "source": "scan"
-      }
-    },
-    {
-      "name": "FORESKIN",
-      "symbol": "FORESKIN",
-      "contract": "Dr5YqYNJxT2W644nAwN2K54wXj3qtGkpR6AmaKJ6pump",
-      "entry_price": 6.35e-05,
-      "confidence": 8,
-      "reason": "Micro\u2011cap $61k, 8h age, buy ratio 2.71, moderate 2.21x volume spike, 1h change 16% (<20), heavy buying pressure",
-      "picked_at": "2026-02-17T07:08",
-      "scans_tracked": 5,
-      "peak_price": 6.35e-05,
-      "lowest_price": 4.499e-05,
-      "entry_snapshot": {
-        "market_cap": 61343.0,
-        "mc_tier": "micro (<100k)",
-        "liquidity": 19753.22,
-        "liq_to_mc_ratio": 0.322,
-        "volume_1h": 5157.73,
-        "volume_24h": 56107.1,
-        "vol_spike": 2.21,
-        "vol_tier": "moderate",
-        "buy_ratio_1h": 2.71,
-        "pressure_tier": "heavy_buying",
-        "price_change_1h": 16.11,
-        "price_change_6h": 41.78,
-        "price_change_24h": 76.18,
-        "dex": "pumpswap",
-        "hours_old": 8.6,
-        "source": "scan"
-      }
-    },
     {
       "name": "MUNCHKIN",
       "symbol": "MUNCHKIN",
@@ -984,9 +906,9 @@
       "confidence": 7,
       "reason": "Micro\u2011cap $80k, 7h age, buy ratio 1.6, low 1.27x volume spike, 1h change -3.8%, strong buying activity",
       "picked_at": "2026-02-17T07:08",
-      "scans_tracked": 5,
+      "scans_tracked": 6,
       "peak_price": 8.047e-05,
-      "lowest_price": 7.065e-05,
+      "lowest_price": 6.922e-05,
       "entry_snapshot": {
         "market_cap": 79766.0,
         "mc_tier": "micro (<100k)",
@@ -1014,7 +936,7 @@
       "confidence": 6,
       "reason": "Micro\u2011cap $38k, ~24h age, buy ratio 1.46, modest 1.25x volume spike, 1h change 13%, balanced buying pressure",
       "picked_at": "2026-02-17T07:08",
-      "scans_tracked": 5,
+      "scans_tracked": 6,
       "peak_price": 3.787e-05,
       "lowest_price": 2.308e-05,
       "entry_snapshot": {
@@ -1044,7 +966,7 @@
       "confidence": 8,
       "reason": "Micro\u2011cap, strong buy ratio 2.65, age 8h, moderate 2.22x volume spike, +8% 1h change",
       "picked_at": "2026-02-17T07:16",
-      "scans_tracked": 4,
+      "scans_tracked": 5,
       "peak_price": 6.068e-05,
       "lowest_price": 4.499e-05,
       "entry_snapshot": {
@@ -1074,9 +996,9 @@
       "confidence": 7,
       "reason": "Micro\u2011cap, buy ratio 1.62, age 7h, 1.28x volume spike, -3% 1h change within safe range",
       "picked_at": "2026-02-17T07:16",
-      "scans_tracked": 4,
+      "scans_tracked": 5,
       "peak_price": 8.047e-05,
-      "lowest_price": 7.065e-05,
+      "lowest_price": 6.922e-05,
       "entry_snapshot": {
         "market_cap": 80470.0,
         "mc_tier": "micro (<100k)",
@@ -1104,8 +1026,8 @@
       "confidence": 6,
       "reason": "Micro\u2011cap, very high buy ratio 6.0, age 24h, low volume spike (0.12x) but positive 8% 1h change",
       "picked_at": "2026-02-17T07:16",
-      "scans_tracked": 4,
-      "peak_price": 1.912e-05,
+      "scans_tracked": 5,
+      "peak_price": 2.319e-05,
       "lowest_price": 1.451e-05,
       "entry_snapshot": {
         "market_cap": 14837.0,
@@ -1134,8 +1056,8 @@
       "confidence": 8,
       "reason": "Micro-cap, moderate volume spike, and buy ratio > 1.0",
       "picked_at": "2026-02-17T10:10",
-      "scans_tracked": 3,
-      "peak_price": 1.912e-05,
+      "scans_tracked": 4,
+      "peak_price": 2.319e-05,
       "lowest_price": 1.644e-05,
       "entry_snapshot": {
         "market_cap": 16814.0,
@@ -1164,7 +1086,7 @@
       "confidence": 7,
       "reason": "Micro-cap, moderate volume, and buy ratio > 1.0",
       "picked_at": "2026-02-17T10:10",
-      "scans_tracked": 3,
+      "scans_tracked": 4,
       "peak_price": 1.472e-05,
       "lowest_price": 5.177e-06,
       "entry_snapshot": {
@@ -1194,8 +1116,8 @@
       "confidence": 6,
       "reason": "Low market cap, moderate volume spike, and high buy ratio",
       "picked_at": "2026-02-17T10:10",
-      "scans_tracked": 3,
-      "peak_price": 0.000449,
+      "scans_tracked": 4,
+      "peak_price": 0.000485,
       "lowest_price": 0.0003546,
       "entry_snapshot": {
         "market_cap": 110192.0,
@@ -1224,8 +1146,8 @@
       "confidence": 8,
       "reason": "Micro-cap, moderate volume spike, strong buy pressure, and whale accumulation",
       "picked_at": "2026-02-17T11:59",
-      "scans_tracked": 2,
-      "peak_price": 1.912e-05,
+      "scans_tracked": 3,
+      "peak_price": 2.319e-05,
       "lowest_price": 1.836e-05,
       "entry_snapshot": {
         "market_cap": 18776.0,
@@ -1254,8 +1176,8 @@
       "confidence": 7,
       "reason": "Low market cap, high buy ratio, and whale accumulation",
       "picked_at": "2026-02-17T11:59",
-      "scans_tracked": 2,
-      "peak_price": 0.000449,
+      "scans_tracked": 3,
+      "peak_price": 0.000485,
       "lowest_price": 0.0004185,
       "entry_snapshot": {
         "market_cap": 130050.0,
@@ -1284,9 +1206,9 @@
       "confidence": 6,
       "reason": "Strong buy pressure, high buy ratio, and moderate volume spike",
       "picked_at": "2026-02-17T11:59",
-      "scans_tracked": 2,
+      "scans_tracked": 3,
       "peak_price": 0.000534,
-      "lowest_price": 0.0005078,
+      "lowest_price": 0.0004937,
       "entry_snapshot": {
         "market_cap": 530193.0,
         "mc_tier": "mid (500k-2M)",
@@ -1314,8 +1236,8 @@
       "confidence": 9,
       "reason": "Whale accumulation, high buy ratio, and moderate volume spike",
       "picked_at": "2026-02-17T13:47",
-      "scans_tracked": 1,
-      "peak_price": 0.000449,
+      "scans_tracked": 2,
+      "peak_price": 0.000485,
       "lowest_price": 0.0004489,
       "entry_snapshot": {
         "market_cap": 139496.0,
@@ -1344,8 +1266,8 @@
       "confidence": 8,
       "reason": "Strong buy pressure, high buy ratio, and moderate volume spike",
       "picked_at": "2026-02-17T13:47",
-      "scans_tracked": 1,
-      "peak_price": 4.554e-05,
+      "scans_tracked": 2,
+      "peak_price": 4.56e-05,
       "lowest_price": 4.499e-05,
       "entry_snapshot": {
         "market_cap": 43995.0,
@@ -1374,9 +1296,9 @@
       "confidence": 7,
       "reason": "Strong buy pressure, whale accumulation, and moderate volume spike",
       "picked_at": "2026-02-17T13:47",
-      "scans_tracked": 1,
+      "scans_tracked": 2,
       "peak_price": 0.0003037,
-      "lowest_price": 0.0003019,
+      "lowest_price": 0.0002994,
       "entry_snapshot": {
         "market_cap": 293281.0,
         "mc_tier": "small (100k-500k)",
@@ -1404,8 +1326,8 @@
       "confidence": 8,
       "reason": "Micro\u2011cap, 15h age, strong buy ratio 1.65, volume spike 1.9x, whale accumulation",
       "picked_at": "2026-02-17T13:50",
-      "scans_tracked": 0,
-      "peak_price": 4.499e-05,
+      "scans_tracked": 1,
+      "peak_price": 4.56e-05,
       "lowest_price": 4.499e-05,
       "entry_snapshot": {
         "market_cap": 43469.0,
@@ -1434,9 +1356,9 @@
       "confidence": 7,
       "reason": "Micro\u2011cap, 14h age, solid buy ratio 1.4, normal volume spike 1.09x, good liquidity",
       "picked_at": "2026-02-17T13:50",
-      "scans_tracked": 0,
+      "scans_tracked": 1,
       "peak_price": 7.084e-05,
-      "lowest_price": 7.084e-05,
+      "lowest_price": 6.922e-05,
       "entry_snapshot": {
         "market_cap": 70847.0,
         "mc_tier": "micro (<100k)",
@@ -1464,8 +1386,8 @@
       "confidence": 6,
       "reason": "Micro\u2011cap, 17h age, buy ratio 1.44, moderate volume, strong whale accumulation",
       "picked_at": "2026-02-17T13:50",
-      "scans_tracked": 0,
-      "peak_price": 0.000449,
+      "scans_tracked": 1,
+      "peak_price": 0.000485,
       "lowest_price": 0.000449,
       "entry_snapshot": {
         "market_cap": 139528.0,
@@ -1483,6 +1405,96 @@
         "price_change_24h": 165.0,
         "dex": "meteora",
         "hours_old": 17.9,
+        "source": "scan"
+      }
+    },
+    {
+      "name": "FORESKIN",
+      "symbol": "FORESKIN",
+      "contract": "Dr5YqYNJxT2W644nAwN2K54wXj3qtGkpR6AmaKJ6pump",
+      "entry_price": 4.56e-05,
+      "confidence": 8,
+      "reason": "Micro\u2011cap, 16h age, buy ratio 1.71, moderate 1.86x volume spike, strong whale buy pressure",
+      "picked_at": "2026-02-17T14:34",
+      "scans_tracked": 0,
+      "peak_price": 4.56e-05,
+      "lowest_price": 4.56e-05,
+      "entry_snapshot": {
+        "market_cap": 44058.0,
+        "mc_tier": "micro (<100k)",
+        "liquidity": 16646.37,
+        "liq_to_mc_ratio": 0.3778,
+        "volume_1h": 5828.78,
+        "volume_24h": 75014.39,
+        "vol_spike": 1.86,
+        "vol_tier": "moderate",
+        "buy_ratio_1h": 1.71,
+        "pressure_tier": "strong_buying",
+        "price_change_1h": -23.4,
+        "price_change_6h": -25.97,
+        "price_change_24h": 26.54,
+        "dex": "pumpswap",
+        "hours_old": 16.1,
+        "source": "scan"
+      }
+    },
+    {
+      "name": "Grok Agents",
+      "symbol": "Agents",
+      "contract": "GqTy5PJL6kx1cYk9rV7NNCRYE5XiZh2dVAyUTDSxpump",
+      "entry_price": 9.445e-05,
+      "confidence": 7,
+      "reason": "Micro\u2011cap, 3h age, buy ratio 1.47, 2.58x volume spike (within safe range), solid liquidity",
+      "picked_at": "2026-02-17T14:34",
+      "scans_tracked": 0,
+      "peak_price": 9.445e-05,
+      "lowest_price": 9.445e-05,
+      "entry_snapshot": {
+        "market_cap": 94459.0,
+        "mc_tier": "micro (<100k)",
+        "liquidity": 26229.8,
+        "liq_to_mc_ratio": 0.2777,
+        "volume_1h": 127776.21,
+        "volume_24h": 1186852.66,
+        "vol_spike": 2.58,
+        "vol_tier": "moderate",
+        "buy_ratio_1h": 1.47,
+        "pressure_tier": "balanced",
+        "price_change_1h": 4.59,
+        "price_change_6h": 164.0,
+        "price_change_24h": 164.0,
+        "dex": "pumpswap",
+        "hours_old": 3.0,
+        "source": "scan"
+      }
+    },
+    {
+      "name": "MUNCHKIN",
+      "symbol": "MUNCHKIN",
+      "contract": "4EmCYV1vn5X27jiLA5sWDhPMZWH5AWKzwjnCS2Atpump",
+      "entry_price": 6.922e-05,
+      "confidence": 6,
+      "reason": "Micro\u2011cap, 15h age, buy ratio 1.52, low 1.04x volume spike, strong buy pressure and good liquidity",
+      "picked_at": "2026-02-17T14:34",
+      "scans_tracked": 0,
+      "peak_price": 6.922e-05,
+      "lowest_price": 6.922e-05,
+      "entry_snapshot": {
+        "market_cap": 81164.0,
+        "mc_tier": "micro (<100k)",
+        "liquidity": 22276.8,
+        "liq_to_mc_ratio": 0.2745,
+        "volume_1h": 6761.98,
+        "volume_24h": 132564.43,
+        "vol_spike": 1.22,
+        "vol_tier": "normal",
+        "buy_ratio_1h": 1.54,
+        "pressure_tier": "strong_buying",
+        "price_change_1h": 14.65,
+        "price_change_6h": 3.43,
+        "price_change_24h": 124.0,
+        "dex": "pumpswap",
+        "hours_old": 15.1,
         "source": "scan"
       }
     }
@@ -2502,14 +2514,84 @@
       "peak_return_pct": 4.4,
       "result": "LOSS",
       "closed_at": "2026-02-17T04:22"
+    },
+    {
+      "name": "Essence Of Time",
+      "symbol": "Time",
+      "contract": "H8TjXYtF9m5wc3fhuRApkRgSe5wi2kK3F2ZwTLCNpump",
+      "entry_price": 1.276e-05,
+      "confidence": 7,
+      "reason": "New token, low market cap, and high buy ratio",
+      "picked_at": "2026-02-17T05:37",
+      "scans_tracked": 12,
+      "peak_price": 1.472e-05,
+      "lowest_price": 5.177e-06,
+      "entry_snapshot": {
+        "market_cap": 12730.0,
+        "mc_tier": "micro (<100k)",
+        "liquidity": 9411.94,
+        "liq_to_mc_ratio": 0.7394,
+        "volume_1h": 18542.28,
+        "volume_24h": 970120.1,
+        "vol_spike": 0.46,
+        "vol_tier": "normal",
+        "buy_ratio_1h": 1.22,
+        "pressure_tier": "balanced",
+        "price_change_1h": 32.49,
+        "price_change_6h": -76.56,
+        "price_change_24h": -64.65,
+        "dex": "pumpswap",
+        "hours_old": 6.5,
+        "source": "scan"
+      },
+      "final_price": 6.685e-06,
+      "return_pct": -47.6,
+      "peak_return_pct": 15.4,
+      "result": "LOSS",
+      "closed_at": "2026-02-17T14:34"
+    },
+    {
+      "name": "FORESKIN",
+      "symbol": "FORESKIN",
+      "contract": "Dr5YqYNJxT2W644nAwN2K54wXj3qtGkpR6AmaKJ6pump",
+      "entry_price": 4.853e-05,
+      "confidence": 6,
+      "reason": "New token, low market cap, and high buy ratio with heavy buy pressure",
+      "picked_at": "2026-02-17T05:37",
+      "scans_tracked": 12,
+      "peak_price": 6.387e-05,
+      "lowest_price": 4.499e-05,
+      "entry_snapshot": {
+        "market_cap": 46881.0,
+        "mc_tier": "micro (<100k)",
+        "liquidity": 17184.51,
+        "liq_to_mc_ratio": 0.3666,
+        "volume_1h": 4389.29,
+        "volume_24h": 48159.8,
+        "vol_spike": 2.19,
+        "vol_tier": "moderate",
+        "buy_ratio_1h": 2.56,
+        "pressure_tier": "heavy_buying",
+        "price_change_1h": 1.24,
+        "price_change_6h": 2.64,
+        "price_change_24h": 34.64,
+        "dex": "pumpswap",
+        "hours_old": 7.1,
+        "source": "scan"
+      },
+      "final_price": 4.56e-05,
+      "return_pct": -6.0,
+      "peak_return_pct": 31.6,
+      "result": "NEUTRAL",
+      "closed_at": "2026-02-17T14:34"
     }
   ],
   "performance": {
-    "total_picks": 29,
+    "total_picks": 31,
     "wins": 8,
-    "losses": 18,
-    "neutral": 3,
-    "avg_return_pct": 301.8,
+    "losses": 19,
+    "neutral": 4,
+    "avg_return_pct": 280.6,
     "best_pick": {
       "name": "Clavicular",
       "return_pct": 4854.9
@@ -2547,7 +2629,8 @@
     "Punch\u2019s Father: -27.9% loss. Peak was +0.0%. Reason picked: New token, low volume spike, and high buy ratio",
     "Wealth Mogging: -38.8% loss. Peak was +0.0%. Reason picked: New token, low volume spike, and moderate buy pressure",
     "Punch\u2019s Father: -19.2% loss. Peak was +0.0%. Reason picked: Low market cap, moderate buy pressure, and no extreme volume spikes",
-    "Punch\u2019s Father: -14.4% loss. Peak was +4.4%. Reason picked: Low market cap, recent listing, and potential for growth"
+    "Punch\u2019s Father: -14.4% loss. Peak was +4.4%. Reason picked: Low market cap, recent listing, and potential for growth",
+    "Essence Of Time: -47.6% loss. Peak was +15.4%. Reason picked: New token, low market cap, and high buy ratio"
   ],
   "strategy_rules": [
     "Prioritize micro-cap tokens (<100k) - they had the highest win rate among all market cap categories.",
@@ -2572,7 +2655,9 @@
     "Consider tokens with high buy pressure and moderate volume",
     "Prioritize tokens with high buy ratio and whale accumulation",
     "Require a minimum buy ratio of 1.5 for new tokens",
-    "Allow buy ratios as low as 1.4 when whale accumulation > 2% of supply"
+    "Allow buy ratios as low as 1.4 when whale accumulation > 2% of supply",
+    "Prioritize tokens with strong whale buy pressure",
+    "Consider tokens with low volume spikes if they have strong buy pressure and good liquidity"
   ],
   "mistake_log": [
     {
@@ -2750,13 +2835,23 @@
         "low volume spike at entry",
         "sellers outnumbered buyers at entry"
       ]
+    },
+    {
+      "date": "2026-02-17",
+      "token": "Essence Of Time",
+      "return_pct": -47.6,
+      "confidence_was": 7,
+      "lesson": "Lost -47.6% on Essence Of Time. Warning signs: low volume spike at entry",
+      "conditions": [
+        "low volume spike at entry"
+      ]
     }
   ],
   "roi_tiers": {
     "MC_micro (<100k)": {
-      "avg_roi": 455.6,
-      "count": 20,
-      "win_rate": 30.0
+      "avg_roi": 411.8,
+      "count": 22,
+      "win_rate": 27.3
     },
     "MC_small (100k-500k)": {
       "avg_roi": -27.4,
@@ -2769,14 +2864,14 @@
       "win_rate": 0.0
     },
     "Vol_normal": {
-      "avg_roi": 536.4,
-      "count": 17,
-      "win_rate": 35.3
+      "avg_roi": 504.0,
+      "count": 18,
+      "win_rate": 33.3
     },
     "Vol_moderate": {
-      "avg_roi": -9.5,
-      "count": 4,
-      "win_rate": 50.0
+      "avg_roi": -8.8,
+      "count": 5,
+      "win_rate": 40.0
     },
     "Vol_extreme_spike": {
       "avg_roi": -23.4,
@@ -2789,14 +2884,14 @@
       "win_rate": 0.0
     },
     "Pressure_heavy_buying": {
-      "avg_roi": 604.2,
-      "count": 7,
-      "win_rate": 42.9
+      "avg_roi": 527.9,
+      "count": 8,
+      "win_rate": 37.5
     },
     "Pressure_balanced": {
-      "avg_roi": 526.0,
-      "count": 9,
-      "win_rate": 33.3
+      "avg_roi": 468.7,
+      "count": 10,
+      "win_rate": 30.0
     },
     "Pressure_strong_buying": {
       "avg_roi": -15.1,
@@ -2809,9 +2904,9 @@
       "win_rate": 0.0
     },
     "Age_6-24h": {
-      "avg_roi": 202.2,
-      "count": 20,
-      "win_rate": 35.0
+      "avg_roi": 181.3,
+      "count": 22,
+      "win_rate": 31.8
     },
     "Age_1-6h": {
       "avg_roi": 1198.5,
@@ -3583,14 +3678,66 @@
       "entry_price_change_1h": -9.8,
       "entry_age_hours": 23.8,
       "entry_dex": "pumpswap"
+    },
+    {
+      "name": "Essence Of Time",
+      "symbol": "Time",
+      "contract": "H8TjXYtF9m5wc3fhuRApkRgSe5wi2kK3F2ZwTLCNpump",
+      "entry_price": 1.276e-05,
+      "exit_price": 6.685e-06,
+      "return_pct": -47.6,
+      "peak_return_pct": 15.4,
+      "result": "LOSS",
+      "confidence_at_pick": 7,
+      "reason": "New token, low market cap, and high buy ratio",
+      "picked_at": "2026-02-17T05:37",
+      "closed_at": "2026-02-17T14:34",
+      "scans_held": 12,
+      "entry_market_cap": 12730.0,
+      "entry_mc_tier": "micro (<100k)",
+      "entry_liquidity": 9411.94,
+      "entry_liq_ratio": 0.7394,
+      "entry_vol_spike": 0.46,
+      "entry_vol_tier": "normal",
+      "entry_buy_ratio": 1.22,
+      "entry_pressure": "balanced",
+      "entry_price_change_1h": 32.49,
+      "entry_age_hours": 6.5,
+      "entry_dex": "pumpswap"
+    },
+    {
+      "name": "FORESKIN",
+      "symbol": "FORESKIN",
+      "contract": "Dr5YqYNJxT2W644nAwN2K54wXj3qtGkpR6AmaKJ6pump",
+      "entry_price": 4.853e-05,
+      "exit_price": 4.56e-05,
+      "return_pct": -6.0,
+      "peak_return_pct": 31.6,
+      "result": "NEUTRAL",
+      "confidence_at_pick": 6,
+      "reason": "New token, low market cap, and high buy ratio with heavy buy pressure",
+      "picked_at": "2026-02-17T05:37",
+      "closed_at": "2026-02-17T14:34",
+      "scans_held": 12,
+      "entry_market_cap": 46881.0,
+      "entry_mc_tier": "micro (<100k)",
+      "entry_liquidity": 17184.51,
+      "entry_liq_ratio": 0.3666,
+      "entry_vol_spike": 2.19,
+      "entry_vol_tier": "moderate",
+      "entry_buy_ratio": 2.56,
+      "entry_pressure": "heavy_buying",
+      "entry_price_change_1h": 1.24,
+      "entry_age_hours": 7.1,
+      "entry_dex": "pumpswap"
     }
   ],
   "pattern_stats": {
     "by_mc_tier": {
       "micro (<100k)": {
-        "total": 20,
+        "total": 22,
         "wins": 6,
-        "losses": 12,
+        "losses": 13,
         "returns": [
           39.8,
           51.5,
@@ -3611,7 +3758,9 @@
           4854.9,
           0.3,
           4343.9,
-          -14.4
+          -14.4,
+          -47.6,
+          -6.0
         ]
       },
       "small (100k-500k)": {
@@ -3640,9 +3789,9 @@
     },
     "by_vol_tier": {
       "normal": {
-        "total": 17,
+        "total": 18,
         "wins": 6,
-        "losses": 8,
+        "losses": 9,
         "returns": [
           39.8,
           51.1,
@@ -3660,18 +3809,20 @@
           0.3,
           -9.1,
           4343.9,
-          -14.4
+          -14.4,
+          -47.6
         ]
       },
       "moderate": {
-        "total": 4,
+        "total": 5,
         "wins": 2,
         "losses": 2,
         "returns": [
           39.7,
           -98.7,
           36.8,
-          -15.8
+          -15.8,
+          -6.0
         ]
       },
       "extreme_spike": {
@@ -3699,7 +3850,7 @@
     },
     "by_pressure_tier": {
       "heavy_buying": {
-        "total": 7,
+        "total": 8,
         "wins": 3,
         "losses": 2,
         "returns": [
@@ -3709,13 +3860,14 @@
           -7.1,
           -99.2,
           0.3,
-          4343.9
+          4343.9,
+          -6.0
         ]
       },
       "balanced": {
-        "total": 9,
+        "total": 10,
         "wins": 3,
-        "losses": 5,
+        "losses": 6,
         "returns": [
           51.1,
           -98.7,
@@ -3725,7 +3877,8 @@
           -45.4,
           -28.3,
           4854.9,
-          -9.1
+          -9.1,
+          -47.6
         ]
       },
       "strong_buying": {
@@ -3758,9 +3911,9 @@
     },
     "by_age_group": {
       "6-24h": {
-        "total": 20,
+        "total": 22,
         "wins": 7,
-        "losses": 11,
+        "losses": 12,
         "returns": [
           39.8,
           51.1,
@@ -3781,7 +3934,9 @@
           -19.2,
           -9.1,
           4343.9,
-          -14.4
+          -14.4,
+          -47.6,
+          -6.0
         ]
       },
       "1-6h": {
@@ -3824,9 +3979,9 @@
     },
     "by_source": {
       "scan": {
-        "total": 29,
+        "total": 31,
         "wins": 8,
-        "losses": 18,
+        "losses": 19,
         "returns": [
           39.8,
           51.1,
@@ -3856,7 +4011,9 @@
           0.3,
           -9.1,
           4343.9,
-          -14.4
+          -14.4,
+          -47.6,
+          -6.0
         ]
       }
     }
@@ -3881,18 +4038,11 @@
       "confidence": 8,
       "reason": "Strong buy pressure, Vol spike 3.96x",
       "opened_at": "2026-02-16T18:46",
-      "last_update": "2026-02-17T13:50",
+      "last_update": "2026-02-17T14:34",
       "peak_price": 8.095206999999999e-06,
       "lowest_price": 6.983e-06,
-      "scans_monitored": 53,
+      "scans_monitored": 54,
       "updates": [
-        {
-          "scan": 34,
-          "price": 7.527e-06,
-          "action": "HOLD",
-          "reason": "Monitoring (-7.0%)",
-          "time": "2026-02-17T04:22"
-        },
         {
           "scan": 35,
           "price": 7.527e-06,
@@ -4025,6 +4175,13 @@
           "action": "HOLD",
           "reason": "Monitoring (-8.7%)",
           "time": "2026-02-17T13:50"
+        },
+        {
+          "scan": 54,
+          "price": 7.348e-06,
+          "action": "HOLD",
+          "reason": "Monitoring (-9.2%)",
+          "time": "2026-02-17T14:34"
         }
       ],
       "entry_snapshot": {
@@ -4058,7 +4215,7 @@
       "entry_price": 1.47067e-05,
       "original_rec_price": 1.459e-05,
       "slippage_pct": 0.8,
-      "stop_loss": 1.434e-05,
+      "stop_loss": 1.80882e-05,
       "original_stop_loss": 1.1030039999999999e-05,
       "tp1": 2.9413439999999998e-05,
       "tp2": 5.1473519999999996e-05,
@@ -4069,10 +4226,10 @@
       "confidence": 8,
       "reason": "Low market cap, high buy ratio, and heavy buy pressure",
       "opened_at": "2026-02-17T06:31",
-      "last_update": "2026-02-17T13:50",
-      "peak_price": 1.912e-05,
+      "last_update": "2026-02-17T14:34",
+      "peak_price": 2.319e-05,
       "lowest_price": 1.451e-05,
-      "scans_monitored": 10,
+      "scans_monitored": 11,
       "updates": [
         {
           "scan": 1,
@@ -4143,6 +4300,13 @@
           "action": "HOLD",
           "reason": "Monitoring (+30.0%)",
           "time": "2026-02-17T13:50"
+        },
+        {
+          "scan": 11,
+          "price": 2.319e-05,
+          "action": "HOLD",
+          "reason": "Monitoring (+57.7%)",
+          "time": "2026-02-17T14:34"
         }
       ],
       "entry_snapshot": {
@@ -4192,11 +4356,19 @@
       "confidence": 8,
       "reason": "Strong buy pressure, high buy ratio, and moderate volume spike",
       "opened_at": "2026-02-17T13:50",
-      "last_update": "2026-02-17T13:50",
-      "peak_price": 4.5228447000000004e-05,
+      "last_update": "2026-02-17T14:34",
+      "peak_price": 4.56e-05,
       "lowest_price": 4.5228447000000004e-05,
-      "scans_monitored": 0,
-      "updates": [],
+      "scans_monitored": 1,
+      "updates": [
+        {
+          "scan": 1,
+          "price": 4.56e-05,
+          "action": "HOLD",
+          "reason": "Monitoring (+0.8%)",
+          "time": "2026-02-17T14:34"
+        }
+      ],
       "entry_snapshot": {
         "market_cap": 43469.0,
         "mc_tier": "micro (<100k)",
@@ -4393,6 +4565,12 @@
       "reason": "Lost -38.8%",
       "blacklisted_at": "2026-02-17T03:57",
       "expires": "2026-02-18T03:57:54.667712"
+    },
+    "H8TjXYtF9m5wc3fhuRApkRgSe5wi2kK3F2ZwTLCNpump": {
+      "name": "Essence Of Time",
+      "reason": "Lost -47.6%",
+      "blacklisted_at": "2026-02-17T14:34",
+      "expires": "2026-02-18T14:34:02.809445"
     }
   }
 }
