@@ -950,9 +950,14 @@ Not financial advice."""
 # AI CALLS (Groq)
 # ============================================================
 
+_last_groq_error = ""  # Stores last Groq error for Telegram reporting
+
 def call_groq(system: str, prompt: str, temperature: float = 0.8,
               timeout: int = GROQ_TIMEOUT_STAGE1, max_tokens: int = GROQ_MAX_TOKENS_STAGE2) -> Optional[str]:
     """Call Groq API with the given system/user messages."""
+    global _last_groq_error
+    prompt_len = len(system) + len(prompt)
+    log.info(f"Groq call: prompt_len={prompt_len}, max_tokens={max_tokens}, timeout={timeout}s")
     try:
         resp = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
@@ -972,18 +977,22 @@ def call_groq(system: str, prompt: str, temperature: float = 0.8,
             timeout=timeout,
         )
         if resp.status_code != 200:
-            log.error(f"Groq API error (HTTP {resp.status_code}): {resp.text[:300]}")
+            _last_groq_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
+            log.error(f"Groq API error: {_last_groq_error}")
             return None
         result = resp.json()
         return result["choices"][0]["message"]["content"]
     except requests.exceptions.Timeout:
-        log.error(f"Groq API timeout after {timeout}s")
+        _last_groq_error = f"Timeout after {timeout}s (prompt_len={prompt_len})"
+        log.error(f"Groq API: {_last_groq_error}")
         return None
     except requests.exceptions.RequestException as e:
-        log.error(f"Groq API request failed: {e}")
+        _last_groq_error = f"Request failed: {str(e)[:200]}"
+        log.error(f"Groq API: {_last_groq_error}")
         return None
     except (KeyError, IndexError) as e:
-        log.error(f"Unexpected Groq response format: {e}")
+        _last_groq_error = f"Bad response format: {str(e)[:200]}"
+        log.error(f"Groq API: {_last_groq_error}")
         return None
 
 
@@ -2455,7 +2464,7 @@ def main() -> None:
     )
 
     if not stage1_result:
-        send_msg("\u26a0\ufe0f Stage 1 failed. Next cycle.")
+        send_msg(f"\u26a0\ufe0f Stage 1 failed: {_last_groq_error}\nNext cycle.")
         save_playbook(playbook)
         return
 
@@ -2508,7 +2517,7 @@ def main() -> None:
         extract_stage2_lessons(research, playbook)
         send_msg(f"\U0001f4ca SCAN #{scan_num} RESEARCH\n{'=' * 30}\n\n{research}")
     else:
-        send_msg("\u26a0\ufe0f Stage 2 failed. Stage 1 picks still valid.")
+        send_msg(f"\u26a0\ufe0f Stage 2 failed: {_last_groq_error}\nStage 1 picks still valid.")
 
     # ---- STEP 5: Queue paper trades ----
     queued, blocked = queue_pending_paper_trades(
