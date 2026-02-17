@@ -18,6 +18,11 @@ Changes from v1:
 - Playbook backup before save
 - Type hints on all functions
 - Deduplication of lessons
+
+v2.1 - Live Trading Integration:
+- Jupiter V6 API integration via trader.py
+- Real buy/sell execution when LIVE_TRADING_ENABLED=true
+- Wallet balance reporting in Telegram status
 """
 
 import os
@@ -30,6 +35,12 @@ import requests
 from datetime import datetime, timedelta
 from collections import Counter
 from typing import Any, Optional
+
+try:
+    from trader import buy_token, sell_token, get_wallet_summary, is_live_trading_enabled
+    TRADER_AVAILABLE = True
+except ImportError:
+    TRADER_AVAILABLE = False
 
 
 # ============================================================
@@ -135,6 +146,9 @@ logging.basicConfig(
 )
 log = logging.getLogger("scanner")
 
+if not TRADER_AVAILABLE:
+    log.warning("trader.py not found - live trading unavailable")
+
 
 # ============================================================
 # CONFIGURATION
@@ -201,11 +215,7 @@ def rate_limited_get(url: str, timeout: int = API_TIMEOUT) -> Optional[requests.
 
 
 def sanitize_for_prompt(text: str, max_length: int = MAX_TOKEN_NAME_LEN) -> str:
-    """Sanitize text for safe inclusion in AI prompts.
-
-    Removes potential prompt injection patterns and control characters,
-    and truncates to max_length.
-    """
+    """Sanitize text for safe inclusion in AI prompts."""
     if not text:
         return "?"
     cleaned = re.sub(r"(?i)(ignore|forget|disregard|override)\s+(all|previous|above|prior)", "", text)
@@ -219,10 +229,7 @@ def sanitize_for_prompt(text: str, max_length: int = MAX_TOKEN_NAME_LEN) -> str:
 
 
 def extract_json_from_response(response: str) -> Optional[list | dict]:
-    """Extract and parse JSON from an AI response.
-
-    Handles ```json code blocks and raw JSON arrays/objects.
-    """
+    """Extract and parse JSON from an AI response."""
     if not response:
         return None
     try:
@@ -270,7 +277,7 @@ def classify_descending(value: float, tiers: list[tuple[float, str]], default: s
 
 
 def parse_price_value(text: str) -> Optional[float]:
-    """Extract a numeric price value from text (e.g., '$0.0003348', '1.073e-05')."""
+    """Extract a numeric price value from text."""
     cleaned = text.replace(",", "")
     for pat in [
         r"\$\s*([0-9]*\.?[0-9]+(?:[eE][+-]?\d+)?)",
@@ -292,7 +299,7 @@ def parse_price_value(text: str) -> Optional[float]:
 # ============================================================
 
 def is_blacklisted(pb: dict, contract: str) -> bool:
-    """Check if a token contract is blacklisted (recently failed)."""
+    """Check if a token contract is blacklisted."""
     blacklist = pb.get("token_blacklist", {})
     entry = blacklist.get(contract)
     if not entry:
@@ -306,7 +313,7 @@ def is_blacklisted(pb: dict, contract: str) -> bool:
 
 
 def blacklist_token(pb: dict, contract: str, name: str, reason: str) -> None:
-    """Add a token to the blacklist for TOKEN_BLACKLIST_HOURS."""
+    """Add a token to the blacklist."""
     blacklist = pb.setdefault("token_blacklist", {})
     expires = (datetime.now() + timedelta(hours=TOKEN_BLACKLIST_HOURS)).isoformat()
     blacklist[contract] = {
@@ -337,7 +344,7 @@ def clean_expired_blacklist(pb: dict) -> None:
 # ============================================================
 
 def _fetch_dex_pairs(contract: str) -> Optional[list[dict]]:
-    """Fetch raw pair data from DexScreener for a Solana token, sorted by liquidity desc."""
+    """Fetch raw pair data from DexScreener for a Solana token."""
     r = rate_limited_get(f"https://api.dexscreener.com/tokens/v1/solana/{contract}")
     if r is None or r.status_code != 200:
         return None
@@ -357,11 +364,7 @@ def _fetch_dex_pairs(contract: str) -> Optional[list[dict]]:
 
 
 def parse_pair_data(pair: dict) -> dict:
-    """Parse a single DEX pair into a standardized market data dictionary.
-
-    This is the SINGLE source of truth for parsing pair data.
-    Used by get_token_price, get_token_market_data, and fetch_scan_data.
-    """
+    """Parse a single DEX pair into a standardized market data dictionary."""
     price = safe_float(pair.get("priceUsd"))
     mc = safe_float(pair.get("marketCap"))
     lq = safe_float(pair.get("liquidity", {}).get("usd"))
@@ -400,7 +403,6 @@ def parse_pair_data(pair: dict) -> dict:
     token_symbol = base_token.get("symbol", "?")
     url = pair.get("url", "?")
 
-    # Age calculation
     pair_created = pair.get("pairCreatedAt")
     hours_old = None
     is_new_tag = ""
@@ -417,7 +419,6 @@ def parse_pair_data(pair: dict) -> dict:
         except (ValueError, TypeError):
             pass
 
-    # Whale signals
     whale_signals = []
     if buy_ratio_1h >= 2.0:
         whale_signals.append("HEAVY buy pressure")
@@ -482,10 +483,7 @@ def get_token_market_data(contract: str) -> Optional[dict]:
 
 
 def format_token_for_prompt(parsed: dict, contract: str, source: str) -> str:
-    """Format parsed pair data into a text block for AI prompts.
-
-    Token names are sanitized to prevent prompt injection.
-    """
+    """Format parsed pair data into a text block for AI prompts."""
     name = sanitize_for_prompt(parsed["token_name"])
     symbol = sanitize_for_prompt(parsed["token_symbol"], max_length=20)
     whale_tag = " | WHALE: " + ", ".join(parsed["whale_signals"]) if parsed["whale_signals"] else ""
@@ -565,7 +563,7 @@ def fetch_new_pairs() -> list[dict]:
 
 
 def fetch_scan_data(token_list: list[dict]) -> list[str]:
-    """Fetch detailed data for tokens and return formatted text blocks for AI prompts."""
+    """Fetch detailed data for tokens and return formatted text blocks."""
     results = []
     seen: set[str] = set()
 
@@ -624,11 +622,7 @@ def run_full_scan() -> tuple[list[str], dict]:
 # ============================================================
 
 def check_token_safety(contract: str) -> tuple[bool, int, list[str], str]:
-    """Check token safety via RugCheck API.
-
-    Returns: (is_safe, score, risk_names, verdict)
-    Defaults to safe if API is unavailable to avoid blocking all trades.
-    """
+    """Check token safety via RugCheck API."""
     try:
         r = rate_limited_get(
             f"https://api.rugcheck.xyz/v1/tokens/{contract}/report/summary"
@@ -730,7 +724,6 @@ def load_playbook() -> dict:
     try:
         with open("playbook.json") as f:
             pb = json.load(f)
-        # Ensure all fields exist (forward-compatible)
         for key, default in _PLAYBOOK_DEFAULTS.items():
             pb.setdefault(key, default)
         log.info(f"Playbook loaded: {pb.get('scans', 0)} scans, {len(pb.get('trade_memory', []))} trades in memory")
@@ -754,7 +747,6 @@ def load_playbook() -> dict:
 
 def save_playbook(pb: dict) -> None:
     """Save playbook to disk with backup and trimming."""
-    # Backup current file
     if os.path.exists("playbook.json"):
         try:
             with open("playbook.json", "r") as src:
@@ -767,14 +759,12 @@ def save_playbook(pb: dict) -> None:
     pb["last_scan"] = datetime.now().isoformat()[:16]
     pb["scans"] = pb.get("scans", 0) + 1
 
-    # Trim all lists to prevent unbounded growth
     for key, limit in TRIM.items():
         if key in pb:
             val = pb[key]
             if isinstance(val, list):
                 pb[key] = val[-limit:]
             elif isinstance(val, dict) and key == "token_blacklist":
-                # Keep most recent entries by blacklisted_at
                 if len(val) > limit:
                     sorted_keys = sorted(
                         val.keys(),
@@ -847,7 +837,6 @@ Default criteria (replaced by learned rules once you have data):
         for ap in avoid_patterns[-10:]:
             base += f"- {ap}\n"
 
-    # Inject blacklisted tokens
     blacklist = pb.get("token_blacklist", {})
     active_blacklist = [
         entry["name"] for addr, entry in blacklist.items()
@@ -878,7 +867,6 @@ IMPORTANT: Only pick coins that realistically have 2x-10x potential.
 Skip anything that looks pumped out or has no room to run.
 """
 
-    # --- Real performance data ---
     stats = pb.get("performance", {})
     total_picks = stats.get("total_picks", 0)
     if total_picks > 0:
@@ -902,7 +890,6 @@ YOUR REAL TRACK RECORD:
             prompt += f"- Worst pick: {worst['name']} ({worst.get('return_pct', 0):+.1f}%)\n"
         prompt += "\nUSE THIS DATA. Adjust your picks based on what types of tokens tend to win/lose.\n"
 
-    # --- ROI tier analysis ---
     roi_tiers = pb.get("roi_tiers", {})
     if roi_tiers:
         prompt += "\n--- ROI ANALYSIS BY SETUP TYPE ---\n"
@@ -910,7 +897,6 @@ YOUR REAL TRACK RECORD:
             prompt += f"- {tier_name}: avg ROI {tier_data.get('avg_roi', 0):+.1f}% across {tier_data.get('count', 0)} picks\n"
         prompt += "PRIORITIZE setup types with the highest historical ROI.\n"
 
-    # --- Win/lose patterns ---
     for label, key in [("PATTERNS THAT LED TO WINS", "win_patterns"), ("PATTERNS THAT LED TO LOSSES", "lose_patterns")]:
         patterns = pb.get(key, [])
         if patterns:
@@ -918,34 +904,29 @@ YOUR REAL TRACK RECORD:
             for p in patterns[-10:]:
                 prompt += f"- {p}\n"
 
-    # --- Strategy rules ---
     rules = pb.get("strategy_rules", [])
     if rules:
         prompt += "\n--- YOUR STRATEGY RULES (learned from real results, FOLLOW THESE) ---\n"
         for r in rules[-15:]:
             prompt += f"- {r}\n"
 
-    # --- Avoid conditions ---
     avoid_conditions = pb.get("avoid_conditions", [])
     if avoid_conditions:
         prompt += "\n--- CONDITIONS TO AVOID (caused losses) ---\n"
         for ac in avoid_conditions[-10:]:
             prompt += f"- {ac}\n"
 
-    # --- Recent mistakes ---
     mistakes = pb.get("mistake_log", [])
     if mistakes:
         prompt += "\n--- RECENT MISTAKES & LESSONS ---\n"
         for m in mistakes[-5:]:
             prompt += f"- [{m.get('date', '')}] {m.get('token', '')}: {m.get('lesson', '')}\n"
 
-    # --- Learned playbook ---
     if pb.get("lessons"):
         prompt += "\n--- YOUR LEARNED PLAYBOOK ---\n"
         for lesson in pb["lessons"][-20:]:
             prompt += f"- [{lesson.get('date', '')}] {lesson.get('note', '')}\n"
 
-    # --- Repeat sightings ---
     recent_tokens = pb.get("tokens_seen", [])[-50:]
     if recent_tokens:
         token_names = [t["name"] for t in recent_tokens]
@@ -955,7 +936,6 @@ YOUR REAL TRACK RECORD:
             for name, count in sorted(repeats.items(), key=lambda x: x[1], reverse=True)[:10]:
                 prompt += f"- {name}: seen {count} times\n"
 
-    # --- Paper trade performance ---
     pt_stats = pb.get("paper_trade_stats", {})
     if pt_stats.get("total_trades", 0) > 0:
         prompt += (
@@ -1059,10 +1039,7 @@ def call_groq(system: str, prompt: str, temperature: float = 0.8) -> Optional[st
 # ============================================================
 
 def save_new_picks(pb: dict, stage1_result: str) -> None:
-    """Parse AI picks, enrich with market snapshots, and save as active picks.
-
-    Also enforces the token blacklist - blacklisted tokens are silently skipped.
-    """
+    """Parse AI picks, enrich with market snapshots, and save as active picks."""
     picks = extract_json_from_response(stage1_result)
     if not picks or not isinstance(picks, list):
         return
@@ -1080,7 +1057,6 @@ def save_new_picks(pb: dict, stage1_result: str) -> None:
             if not contract:
                 continue
 
-            # Enforce blacklist
             if is_blacklisted(pb, contract):
                 log.info(f"Skipping blacklisted token: {pick.get('name', '?')}")
                 continue
@@ -1203,10 +1179,7 @@ def save_trade_memory(pb: dict, pick: dict, current_price: float, return_pct: fl
 
 
 def detect_mistakes(pb: dict, pick: dict, return_pct: float) -> None:
-    """After a significant loss, analyze what went wrong and log it.
-
-    Also updates avoid_conditions and blacklists the token.
-    """
+    """After a significant loss, analyze what went wrong."""
     if return_pct >= -10:
         return
 
@@ -1246,7 +1219,6 @@ def detect_mistakes(pb: dict, pick: dict, return_pct: float) -> None:
         "conditions": conditions,
     })
 
-    # Auto-generate avoid conditions from clear patterns
     avoid = pb.setdefault("avoid_conditions", [])
     new_avoids = []
     if snapshot.get("price_change_1h", 0) > 100:
@@ -1261,7 +1233,6 @@ def detect_mistakes(pb: dict, pick: dict, return_pct: float) -> None:
             avoid.append(rule)
     pb["avoid_conditions"] = avoid[-TRIM["avoid_conditions"]:]
 
-    # Blacklist the token
     if contract and return_pct < -20:
         blacklist_token(pb, contract, name, f"Lost {return_pct:.1f}%")
 
@@ -1310,11 +1281,7 @@ def update_roi_tiers(pb: dict) -> None:
 
 
 def evolve_strategy_rules(pb: dict) -> None:
-    """Evolve strategy rules incrementally using AI analysis.
-
-    Unlike the v1 approach (full replacement), this preserves validated rules
-    and asks the AI to evaluate which to keep, modify, add, or remove.
-    """
+    """Evolve strategy rules incrementally using AI analysis."""
     memory = pb.get("trade_memory", [])
     if len(memory) < MIN_TRADES_FOR_RULES:
         return
@@ -1322,7 +1289,6 @@ def evolve_strategy_rules(pb: dict) -> None:
     existing_rules = pb.get("strategy_rules", [])
     roi_tiers = pb.get("roi_tiers", {})
 
-    # Build data summary
     wins = [t for t in memory if t["return_pct"] >= 20]
     losses = [t for t in memory if t["return_pct"] < -10]
 
@@ -1396,7 +1362,7 @@ Total rules should be 5-10. Each must be specific, actionable, and data-backed."
 
         new_rules: list[str] = []
         for i, rule in enumerate(existing_rules):
-            idx = i + 1  # 1-indexed
+            idx = i + 1
             if idx in remove_indices:
                 continue
             if idx in modify_map:
@@ -1416,7 +1382,7 @@ Total rules should be 5-10. Each must be specific, actionable, and data-backed."
 
 
 def check_past_picks(pb: dict) -> Optional[str]:
-    """Check current prices of active picks and update performance with full trade memory."""
+    """Check current prices of active picks and update performance."""
     active = pb.get("active_picks", [])
     if not active:
         return None
@@ -1442,7 +1408,7 @@ def check_past_picks(pb: dict) -> Optional[str]:
                 return_pct = -100.0
                 result_tag = "DEAD/RUGGED"
                 save_trade_memory(pb, pick, 0, return_pct, result_tag)
-                update_pattern_stats(pb, pick, return_pct, result_tag)
+                update_pattern_stats(pb, pick, return_pct)
                 detect_mistakes(pb, pick, return_pct)
                 history.append({
                     **pick,
@@ -1502,12 +1468,11 @@ def check_past_picks(pb: dict) -> Optional[str]:
 
             performance["total_picks"] += 1
             save_trade_memory(pb, pick, current_price, return_pct, result_tag)
-            update_pattern_stats(pb, pick, return_pct, result_tag)
+            update_pattern_stats(pb, pick, return_pct)
 
             if return_pct < -10:
                 detect_mistakes(pb, pick, return_pct)
 
-            # Update best/worst
             best = performance.get("best_pick", {})
             if not best or return_pct > best.get("return_pct", -999):
                 performance["best_pick"] = {"name": pick["name"], "return_pct": return_pct}
@@ -1515,7 +1480,6 @@ def check_past_picks(pb: dict) -> Optional[str]:
             if not worst or return_pct < worst.get("return_pct", 999):
                 performance["worst_pick"] = {"name": pick["name"], "return_pct": return_pct}
 
-            # Running average
             total = performance["total_picks"]
             old_avg = performance.get("avg_return_pct", 0)
             performance["avg_return_pct"] = round(((old_avg * (total - 1)) + return_pct) / total, 1)
@@ -1579,10 +1543,7 @@ def check_past_picks(pb: dict) -> Optional[str]:
 # ============================================================
 
 def parse_trade_setups(research_text: str) -> dict[str, dict]:
-    """Parse trade setups (SL, TP1, TP2, TP3) from Stage 2 research.
-
-    Returns dict keyed by uppercase symbol.
-    """
+    """Parse trade setups from Stage 2 research."""
     setups: dict[str, dict] = {}
     current_symbol: Optional[str] = None
 
@@ -1680,10 +1641,7 @@ def create_paper_trade(pb: dict, pick: dict, trade_setup: dict, scan_num: int) -
 
 
 def apply_trailing_stop(trade: dict, current_price: float) -> tuple[bool, float]:
-    """Apply adaptive trailing stop loss. Tighter trail at higher profits.
-
-    Returns (was_adjusted, new_stop_loss).
-    """
+    """Apply adaptive trailing stop loss."""
     entry = trade["entry_price"]
     peak = trade.get("peak_price", entry)
     current_sl = trade["stop_loss"]
@@ -1709,11 +1667,7 @@ def apply_trailing_stop(trade: dict, current_price: float) -> tuple[bool, float]
 
 
 def evaluate_trade_action(trade: dict, current_price: float, current_data: Optional[dict]) -> tuple[str, str]:
-    """Evaluate what action to take on an open paper trade.
-
-    apply_trailing_stop() should be called BEFORE this function.
-    Returns (action, reason).
-    """
+    """Evaluate what action to take on an open paper trade."""
     entry = trade["entry_price"]
     sl = trade["stop_loss"]
     tp1 = trade["tp1"]
@@ -1811,6 +1765,15 @@ def close_paper_trade(pb: dict, trade: dict, exit_price: float, reason: str) -> 
     if return_pct < -20 and trade.get("contract"):
         blacklist_token(pb, trade["contract"], trade["token_name"], f"Paper trade lost {return_pct:.1f}%")
 
+    # ---- LIVE TRADING: Execute real sell ----
+    if TRADER_AVAILABLE and is_live_trading_enabled():
+        sell_result = sell_token(trade["contract"])
+        closed_record["live_sell"] = sell_result
+        if sell_result["success"]:
+            log.info(f"LIVE SELL: {trade['token_name']} | tx: {sell_result['signature']}")
+        else:
+            log.warning(f"LIVE SELL FAILED: {trade['token_name']} | {sell_result['error']}")
+
     pb.setdefault("paper_trade_history", []).append(closed_record)
     pb["paper_trade_history"] = pb["paper_trade_history"][-TRIM["paper_trade_history"]:]
     update_paper_trade_stats(pb)
@@ -1863,7 +1826,7 @@ def update_paper_trade_stats(pb: dict) -> None:
 
 
 def monitor_paper_trades(pb: dict) -> Optional[str]:
-    """Monitor all open paper trades. Returns Telegram report text or None."""
+    """Monitor all open paper trades."""
     trades = pb.get("paper_trades", [])
     if not trades:
         return None
@@ -1949,7 +1912,7 @@ def monitor_paper_trades(pb: dict) -> Optional[str]:
                 f"\U0001f7e2 {trade['trade_id']} {trade['symbol']}: "
                 f"{return_pct:+.1f}% | STRONG SIGNAL\n   {reason}"
             )
-        else:  # HOLD
+        else:
             still_open.append(trade)
             emoji = "\U0001f4c8" if return_pct > 0 else "\U0001f4c9" if return_pct < 0 else "\u2796"
             peak_ret = round(((trade["peak_price"] - trade["entry_price"]) / trade["entry_price"]) * 100, 1)
@@ -2003,10 +1966,7 @@ def monitor_paper_trades(pb: dict) -> Optional[str]:
 
 
 def queue_pending_paper_trades(pb: dict, stage1_result: str, research_text: str, scan_num: int) -> tuple[list, list]:
-    """Queue high-confidence picks as PENDING paper trades with RugCheck safety gate.
-
-    Returns (queued_entries, blocked_entries).
-    """
+    """Queue high-confidence picks as PENDING paper trades with RugCheck safety gate."""
     open_trades = pb.get("paper_trades", [])
     pending = pb.get("pending_paper_trades", [])
 
@@ -2042,7 +2002,6 @@ def queue_pending_paper_trades(pb: dict, stage1_result: str, research_text: str,
         if not contract or contract in used_contracts:
             continue
 
-        # Check blacklist
         if is_blacklisted(pb, contract):
             blocked.append({
                 "name": pick.get("name", "?"),
@@ -2054,7 +2013,6 @@ def queue_pending_paper_trades(pb: dict, stage1_result: str, research_text: str,
             })
             continue
 
-        # RugCheck safety gate
         is_safe, safety_score, risk_names, verdict = check_token_safety(contract)
         if not is_safe:
             blocked.append({
@@ -2096,15 +2054,7 @@ def queue_pending_paper_trades(pb: dict, stage1_result: str, research_text: str,
 
 
 def confirm_pending_trades(pb: dict) -> tuple[list, list]:
-    """Confirm or reject pending paper trades from the previous scan.
-
-    Confirmation criteria:
-    1. Price hasn't dumped more than PRICE_DUMP_REJECT_PCT since recommendation
-    2. Buy pressure >= BUY_PRESSURE_CONFIRM_MIN
-    3. Token is still reachable
-
-    Returns (confirmed_trades, rejected_info).
-    """
+    """Confirm or reject pending paper trades from the previous scan."""
     pending = pb.get("pending_paper_trades", [])
     if not pending:
         return [], []
@@ -2163,6 +2113,16 @@ def confirm_pending_trades(pb: dict) -> tuple[list, list]:
             open_contracts.add(contract)
             confirmed.append(trade)
 
+            # ---- LIVE TRADING: Execute real buy ----
+            if TRADER_AVAILABLE and is_live_trading_enabled():
+                max_sol = float(os.environ.get("MAX_SOL_PER_TRADE", "0.03"))
+                buy_result = buy_token(contract, max_sol)
+                trade["live_trade"] = buy_result
+                if buy_result["success"]:
+                    log.info(f"LIVE BUY: {trade['token_name']} | tx: {buy_result['signature']}")
+                else:
+                    log.warning(f"LIVE BUY FAILED: {trade['token_name']} | {buy_result['error']}")
+
     pb["pending_paper_trades"] = []
     pb["paper_trades"] = open_trades
     return confirmed, rejected
@@ -2193,9 +2153,14 @@ def format_confirmation_alert(confirmed: list, rejected: list) -> str:
         lines.append(f"\u2705 CONFIRMED ({len(confirmed)}):")
         for trade in confirmed:
             pc = trade.get("price_change_during_confirmation", 0)
+            live_tag = ""
+            if trade.get("live_trade", {}).get("success"):
+                live_tag = " | LIVE BUY \u2705"
+            elif trade.get("live_trade"):
+                live_tag = " | LIVE BUY \u274c"
             lines.append(
                 f"  \U0001f7e2 {trade['token_name']} ({trade['symbol']}) "
-                f"${trade['entry_price']:.10g} ({pc:+.1f}%)"
+                f"${trade['entry_price']:.10g} ({pc:+.1f}%){live_tag}"
             )
     if rejected:
         lines.append(f"\u274c REJECTED ({len(rejected)}):")
@@ -2223,23 +2188,13 @@ def format_new_trade_alert(trade: dict) -> str:
 # ============================================================
 
 def extract_stage2_lessons(research_text: str, pb: dict) -> None:
-    """Extract structured lessons from Stage 2 research output.
-
-    Looks for the ```json block at the end of the research with:
-    - lessons: list of specific learnings
-    - rule_updates: {add, remove_keywords}
-    - self_reflection: string
-
-    Falls back to legacy string splitting if JSON not found.
-    """
+    """Extract structured lessons from Stage 2 research output."""
     parsed = extract_json_from_response(research_text)
 
     if parsed and isinstance(parsed, dict):
-        # Structured extraction
         lessons = parsed.get("lessons", [])
         for lesson in lessons:
             if isinstance(lesson, str) and lesson.strip():
-                # Deduplicate: skip if very similar to recent lessons
                 existing_notes = [l.get("note", "") for l in pb.get("lessons", [])[-10:]]
                 if not any(lesson.strip()[:50] in existing for existing in existing_notes):
                     pb.setdefault("lessons", []).append({
@@ -2247,7 +2202,6 @@ def extract_stage2_lessons(research_text: str, pb: dict) -> None:
                         "note": lesson.strip()[:500],
                     })
 
-        # Apply rule updates
         rule_updates = parsed.get("rule_updates", {})
         if rule_updates:
             avoid = pb.setdefault("avoid_conditions", [])
@@ -2259,7 +2213,6 @@ def extract_stage2_lessons(research_text: str, pb: dict) -> None:
         log.info(f"Extracted {len(lessons)} lessons from Stage 2 (structured)")
         return
 
-    # Fallback: legacy string splitting
     if "PLAYBOOK" in research_text and "UPDATE" in research_text:
         try:
             note = research_text.split("UPDATE")[-1]
@@ -2375,8 +2328,7 @@ def handle_user_messages(pb: dict) -> None:
         if not text or chat_id != USER_ID:
             continue
 
-        # Sanitize user input
-        sanitized_text = text[:1000]  # Limit input length
+        sanitized_text = text[:1000]
 
         context = build_chat_context(pb)
         system = (
@@ -2427,6 +2379,16 @@ def main() -> None:
         if is_blacklisted(playbook, addr)
     ])
 
+    # ---- Wallet status ----
+    wallet_info = ""
+    if TRADER_AVAILABLE:
+        ws = get_wallet_summary()
+        if "error" not in ws:
+            mode = "LIVE" if ws["live_trading"] else "PAPER"
+            wallet_info = f"\n\U0001f4b0 Wallet: {ws['balance_sol']} SOL | Mode: {mode} | Max: {ws['max_per_trade']} SOL/trade"
+        else:
+            wallet_info = f"\n\U0001f4b0 Wallet: error - {ws['error']}"
+
     send_msg(
         f"\U0001f50d Scan #{scan_num}\n"
         f"\U0001f9e0 {len(playbook.get('lessons', []))}pat | {total_picks}picks {win_rate}%wr | "
@@ -2434,6 +2396,7 @@ def main() -> None:
         f"\U0001f4b5 {pt_open}/{MAX_OPEN_PAPER_TRADES} open | {pt_pending} pending | "
         f"{pt_stats.get('total_trades', 0)} closed {pt_stats.get('win_rate', 0)}%wr\n"
         f"\U0001f6ab {blacklist_count} blacklisted"
+        f"{wallet_info}"
     )
 
     # ---- STEP 1: Check past picks ----
