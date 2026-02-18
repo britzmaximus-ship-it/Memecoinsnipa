@@ -1,116 +1,168 @@
-"""
-discovery.py - Automatic token discovery (Solana) for Memecoinsnipa
-
-Uses Birdeye "Trending tokens" endpoint to discover candidates.
-
-Endpoint: https://public-api.birdeye.so/defi/token_trending
-
-Env vars:
-- BIRDEYE_API_KEY (required)
-- DISCOVERY_LIMIT (default 20, max 20)
-- DISCOVERY_SORT_BY (rank|liquidity|volume24hUSD) default volume24hUSD
-- DISCOVERY_SORT_TYPE (asc|desc) default desc
-- DISCOVERY_MIN_LIQUIDITY_USD (default 50000)
-- DISCOVERY_MIN_VOLUME24H_USD (default 200000)
-- DISCOVERY_EXCLUDE_SYMBOLS (comma-separated, optional)
-"""
-
-from __future__ import annotations
-
-import os
 import time
 import logging
-from typing import Dict, List, Optional
-
 import requests
+from typing import List, Dict, Any
 
-log = logging.getLogger("discovery")
+log = logging.getLogger("memecoinsnipa.discovery")
 
-BIRDEYE_TRENDING_URL = "https://public-api.birdeye.so/defi/token_trending"
-
-
-def _env_str(name: str, default: str = "") -> str:
-    return os.environ.get(name, default).strip()
+SEARCH_URL = "https://api.dexscreener.com/latest/dex/search"
 
 
-def _env_int(name: str, default: int) -> int:
+def _num(x, default=0.0) -> float:
     try:
-        return int(_env_str(name, str(default)))
+        if x is None:
+            return default
+        return float(x)
     except Exception:
         return default
 
 
-def _env_float(name: str, default: float) -> float:
+def _int(x, default=0) -> int:
     try:
-        return float(_env_str(name, str(default)))
+        if x is None:
+            return default
+        return int(x)
     except Exception:
         return default
 
 
-def _headers() -> Dict[str, str]:
-    key = _env_str("BIRDEYE_API_KEY")
-    if not key:
-        raise EnvironmentError("BIRDEYE_API_KEY is missing")
-    return {"accept": "application/json", "X-API-KEY": key, "x-chain": "solana"}
+def _age_minutes(pair_created_at_ms) -> int:
+    if not pair_created_at_ms:
+        return 10**9
+    try:
+        return int(max(0, (time.time() * 1000 - int(pair_created_at_ms)) / 60000))
+    except Exception:
+        return 10**9
 
 
-def _excluded_symbols() -> set:
-    raw = _env_str("DISCOVERY_EXCLUDE_SYMBOLS", "")
-    if not raw:
-        return set()
-    return {s.strip().upper() for s in raw.split(",") if s.strip()}
+def _pair_to_candidate(p: Dict[str, Any]) -> Dict[str, Any]:
+    base = p.get("baseToken") or {}
+    mint = base.get("address") or ""
+    symbol = base.get("symbol") or base.get("name") or (mint[:6] if mint else "UNK")
+
+    age_min = _age_minutes(p.get("pairCreatedAt"))
+
+    liq = _num((p.get("liquidity") or {}).get("usd"), 0.0)
+    mc = _num(p.get("fdv"), 0.0)
+
+    vol = p.get("volume") or {}
+    vol_5m = _num(vol.get("m5"), 0.0)
+    vol_1h = _num(vol.get("h1"), 0.0)
+    vol_24h = _num(vol.get("h24"), 0.0)
+
+    txns = p.get("txns") or {}
+    h1 = txns.get("h1") or {}
+    buys_1h = _int(h1.get("buys"), 0)
+    sells_1h = _int(h1.get("sells"), 0)
+
+    chg = p.get("priceChange") or {}
+    chg_5m = _num(chg.get("m5"), 0.0)
+    chg_1h = _num(chg.get("h1"), 0.0)
+
+    liq_to_mc = (liq / mc) if mc > 0 else 0.0
+
+    # 5m pace vs 1h total. If vol_5m is strong relative to vol_1h, accel > ~1
+    # multiply vol_5m by 12 to estimate an hourly pace.
+    vol_accel = (vol_5m * 12.0) / max(1.0, vol_1h)
+
+    return {
+        "mint": mint,
+        "symbol": symbol,
+        "age_min": age_min,
+        "liq": liq,
+        "mc": mc,
+        "liq_to_mc": liq_to_mc,
+        "vol_5m": vol_5m,
+        "vol_1h": vol_1h,
+        "vol_24h": vol_24h,
+        "buys_1h": buys_1h,
+        "sells_1h": sells_1h,
+        "chg_5m": chg_5m,
+        "chg_1h": chg_1h,
+        "vol_accel": vol_accel,
+        "pair": p.get("pairAddress"),
+        "url": p.get("url"),
+        "dex": p.get("dexId"),
+        "chain": (p.get("chainId") or "").lower(),
+    }
 
 
-def discover_tokens(limit: Optional[int] = None) -> List[str]:
-    """Return a list of token mint addresses (strings)."""
-    lim = limit if limit is not None else _env_int("DISCOVERY_LIMIT", 20)
-    lim = max(1, min(20, lim))
+def discover_solana_candidates(limit: int = 80) -> List[Dict[str, Any]]:
+    """
+    Auto-discovery from DexScreener.
 
-    sort_by = _env_str("DISCOVERY_SORT_BY", "volume24hUSD") or "volume24hUSD"
-    sort_type = _env_str("DISCOVERY_SORT_TYPE", "desc") or "desc"
+    We fetch a broad set of Solana pairs and then your scanner will apply stricter
+    filters + scoring + paper/live decisions.
 
-    min_liq = _env_float("DISCOVERY_MIN_LIQUIDITY_USD", 50_000.0)
-    min_vol = _env_float("DISCOVERY_MIN_VOLUME24H_USD", 200_000.0)
+    Returns: list of candidate dicts.
+    """
+    # DexScreener doesn't expose a perfect "new pairs feed", so we do a broad query
+    # and then aggressively filter + rank.
+    r = requests.get(SEARCH_URL, params={"q": "solana"}, timeout=20)
+    r.raise_for_status()
+    data = r.json()
+    pairs = data.get("pairs") or []
 
-    params = {"sort_by": sort_by, "sort_type": sort_type, "offset": 0, "limit": lim}
+    sol_pairs = [p for p in pairs if (p.get("chainId") or "").lower() == "solana"]
 
-    t0 = time.time()
-    resp = requests.get(BIRDEYE_TRENDING_URL, params=params, headers=_headers(), timeout=20)
-    resp.raise_for_status()
-    data = resp.json()
-
-    if not data.get("success"):
-        raise RuntimeError(f"Birdeye trending returned success=false: {str(data)[:300]}")
-
-    tokens = (data.get("data") or {}).get("tokens") or []
-    excl = _excluded_symbols()
-
-    mints: List[str] = []
-    for t in tokens:
-        try:
-            mint = t.get("address")
-            sym = (t.get("symbol") or "").upper()
-            liq = float(t.get("liquidity") or 0.0)
-            vol = float(t.get("volume24hUSD") or 0.0)
-
-            if not mint:
-                continue
-            if sym and sym in excl:
-                continue
-            if liq < min_liq:
-                continue
-            if vol < min_vol:
-                continue
-
-            mints.append(mint)
-        except Exception:
+    # Convert + dedupe by mint
+    seen = set()
+    candidates: List[Dict[str, Any]] = []
+    for p in sol_pairs:
+        c = _pair_to_candidate(p)
+        mint = c.get("mint")
+        if not mint or mint in seen:
             continue
+        seen.add(mint)
+        candidates.append(c)
 
-    log.info(
-        "Discovery: fetched %d trending tokens (limit=%d) -> %d passed filters in %.2fs",
-        len(tokens),
-        lim,
-        len(mints),
-        time.time() - t0,
-    )
-    return mints
+    # Light ranking here: combine "newness sweet spot" + volume acceleration
+    def discovery_rank(c: Dict[str, Any]) -> float:
+        age = c["age_min"]
+        accel = c["vol_accel"]
+        liq = c["liq"]
+        chg5 = c["chg_5m"]
+
+        score = 0.0
+
+        # Age sweet spot: prefer 15m to 6h for aggressive runs
+        if 15 <= age <= 360:
+            score += 2.0
+        elif age < 15:
+            score += 0.3  # too new = high rug rate
+        elif 360 < age <= 720:
+            score += 0.8
+        else:
+            score -= 0.5
+
+        # Volume acceleration: prefer current 5m pace > 1h average
+        if accel >= 2.0:
+            score += 2.0
+        elif accel >= 1.2:
+            score += 1.0
+        elif accel >= 0.8:
+            score += 0.3
+        else:
+            score -= 0.5
+
+        # Liquidity sanity: higher liq survives swings
+        if liq >= 100_000:
+            score += 1.2
+        elif liq >= 50_000:
+            score += 0.8
+        elif liq >= 20_000:
+            score += 0.3
+        else:
+            score -= 0.8
+
+        # Avoid already-mega candles in 5m (often late)
+        if chg5 >= 60:
+            score -= 0.8
+
+        return score
+
+    candidates.sort(key=discovery_rank, reverse=True)
+    candidates = candidates[: max(20, min(limit, 200))]
+
+    log.info("Discovery: %d candidates after dedupe+rank", len(candidates))
+    return candidates
