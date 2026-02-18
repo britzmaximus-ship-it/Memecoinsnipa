@@ -1,306 +1,172 @@
 """
-trader.py — CLEAN STABLE VERSION (FIXED + DEBUG)
+trader.py – Solana Jupiter Swap Module (Production Safe)
 
-✅ Uses Jupiter Swap API v1 only (api.jup.ag)
-✅ Sends Jupiter API key via x-api-key header (fixes 401 when required)
-✅ Adds targeted debug logs (no secret values printed)
-✅ Correctly signs VersionedTransaction from Jupiter using solders
+Handles:
+- Wallet loading (base58 or JSON array)
+- 32 vs 64 byte key handling
+- Jupiter quote + swap
+- VersionedTransaction signing
+- Raw transaction submission
 """
 
 import os
-import time
+import json
 import base64
-import logging
-import requests
 import base58
+import requests
+import logging
 
 from solders.keypair import Keypair
 from solders.transaction import VersionedTransaction
 
-# ============================================================
-# LOGGING
-# ============================================================
-
 log = logging.getLogger("trader")
-if not log.handlers:
-    logging.basicConfig(level=logging.INFO)
-
-# ============================================================
-# CONSTANTS
-# ============================================================
+logging.basicConfig(level=logging.INFO)
 
 LAMPORTS_PER_SOL = 1_000_000_000
-SOL_MINT = "So11111111111111111111111111111111111111112"
 
 JUPITER_QUOTE_URL = "https://api.jup.ag/swap/v1/quote"
 JUPITER_SWAP_URL = "https://api.jup.ag/swap/v1/swap"
 
-CONFIRM_TIMEOUT = 60
 
 # ============================================================
-# ENV HELPERS
+# WALLET LOADING
 # ============================================================
 
-def is_live_trading_enabled():
-    return os.environ.get("LIVE_TRADING_ENABLED", "false").lower() == "true"
+def load_keypair():
+    raw_key = (
+        os.environ.get("SOLANA_PRIVATE_KEY")
+        or os.environ.get("WALLET_PRIVATE_KEY_BASE58")
+    )
 
+    if not raw_key:
+        raise Exception("No private key found in environment variables.")
 
-def get_max_sol_per_trade():
-    return float(os.environ.get("MAX_SOL_PER_TRADE", "0.03"))
+    raw_key = raw_key.strip()
 
+    # Try JSON array format first (Solana CLI export)
+    if raw_key.startswith("["):
+        key_bytes = bytes(json.loads(raw_key))
+    else:
+        key_bytes = base58.b58decode(raw_key)
 
-def get_rpc_url():
-    return os.environ.get("SOLANA_RPC_URL")
+    if len(key_bytes) == 64:
+        kp = Keypair.from_bytes(key_bytes)
+    elif len(key_bytes) == 32:
+        kp = Keypair.from_seed(key_bytes)
+    else:
+        raise Exception(f"Unexpected private key length: {len(key_bytes)}")
 
-
-def get_jupiter_api_key():
-    # Railway variable must be EXACTLY JUPITER_API_KEY
-    return os.environ.get("JUPITER_API_KEY", "").strip()
-
-
-def jupiter_headers():
-    """
-    IMPORTANT: Your old code never passed headers to Jupiter.
-    If your account/plan requires a key, missing headers => 401.
-    """
-    key = get_jupiter_api_key()
-    has_key = bool(key)
-    log.info("Has JUPITER_API_KEY? %s", has_key)
-
-    headers = {"accept": "application/json"}
-    if has_key:
-        headers["x-api-key"] = key
-    return headers
-
-
-# ============================================================
-# WALLET
-# ============================================================
-
-def load_wallet():
-    pk = os.environ.get("WALLET_PRIVATE_KEY_BASE58")
-    if not pk:
-        raise EnvironmentError("WALLET_PRIVATE_KEY_BASE58 env var is missing")
-
-    key_bytes = base58.b58decode(pk)
-    return Keypair.from_bytes(key_bytes)
-
-
-# ============================================================
-# RPC
-# ============================================================
-
-def rpc_call(method, params):
-    rpc_url = get_rpc_url()
-    if not rpc_url:
-        raise EnvironmentError("SOLANA_RPC_URL is missing")
-
-    payload = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": method,
-        "params": params,
-    }
-
-    r = requests.post(rpc_url, json=payload, timeout=30)
-    r.raise_for_status()
-    data = r.json()
-
-    if "error" in data:
-        raise RuntimeError(f"RPC error: {data['error']}")
-
-    return data
-
-
-def wait_for_confirmation(signature):
-    start = time.time()
-
-    while time.time() - start < CONFIRM_TIMEOUT:
-        result = rpc_call("getSignatureStatuses", [[signature], {"searchTransactionHistory": True}])
-        status = result["result"]["value"][0]
-
-        if status:
-            if status.get("err"):
-                return False
-
-            if status.get("confirmationStatus") in ("confirmed", "finalized"):
-                return True
-
-        time.sleep(2)
-
-    return False
+    log.info(f"Loaded wallet pubkey: {kp.pubkey()}")
+    return kp
 
 
 # ============================================================
 # JUPITER SWAP
 # ============================================================
 
-def jupiter_swap(input_mint, output_mint, amount, wallet):
-    """
-    amount is raw integer amount:
-      - If input is SOL, amount is lamports
-      - If input is token, amount is raw token units (already decimals-adjusted)
-    """
-    try:
-        # ---- STEP 1: QUOTE ----
-        quote_params = {
-            "inputMint": input_mint,
-            "outputMint": output_mint,
-            "amount": str(amount),
-            "slippageBps": "2500",
-            "swapMode": "ExactIn",
-        }
+def execute_swap(
+    input_mint: str,
+    output_mint: str,
+    amount_sol: float,
+    slippage_bps: int = 2500,
+):
 
-        log.info("Jupiter quote URL: %s", JUPITER_QUOTE_URL)
-        quote_resp = requests.get(
-            JUPITER_QUOTE_URL,
-            params=quote_params,
-            headers=jupiter_headers(),
-            timeout=20
-        )
+    kp = load_keypair()
+    user_pubkey = str(kp.pubkey())
 
-        log.info("Jupiter quote status: %s", quote_resp.status_code)
+    rpc_url = os.environ.get("SOLANA_RPC_URL")
+    if not rpc_url:
+        raise Exception("SOLANA_RPC_URL not set.")
 
-        if quote_resp.status_code == 401:
-            # Print a small slice of body for debug (no secrets)
-            log.error("Jupiter QUOTE 401 Unauthorized. Body: %s", quote_resp.text[:300])
-            return {"success": False, "signature": None, "error": "Jupiter 401 Unauthorized (quote)"}
+    jupiter_api_key = os.environ.get("JUPITER_API_KEY")
+    if not jupiter_api_key:
+        raise Exception("JUPITER_API_KEY not set.")
 
-        quote_resp.raise_for_status()
-        quote = quote_resp.json()
+    amount_lamports = int(amount_sol * LAMPORTS_PER_SOL)
 
-        if isinstance(quote, dict) and "error" in quote:
-            return {"success": False, "signature": None, "error": quote["error"]}
+    # 1. GET QUOTE
+    quote_params = {
+        "inputMint": input_mint,
+        "outputMint": output_mint,
+        "amount": amount_lamports,
+        "slippageBps": slippage_bps,
+    }
 
-        # ---- STEP 2: SWAP TX ----
-        swap_payload = {
-            "quoteResponse": quote,
-            "userPublicKey": str(wallet.pubkey()),
-            "wrapAndUnwrapSol": True,
-            # You can enable these later if you want better landing:
-            # "dynamicComputeUnitLimit": True,
-            # "computeUnitPriceMicroLamports": 20000,
-        }
+    quote_headers = {
+        "x-api-key": jupiter_api_key
+    }
 
-        log.info("Jupiter swap URL: %s", JUPITER_SWAP_URL)
-        swap_resp = requests.post(
-            JUPITER_SWAP_URL,
-            json=swap_payload,
-            headers=jupiter_headers(),
-            timeout=20
-        )
+    quote_res = requests.get(
+        JUPITER_QUOTE_URL,
+        params=quote_params,
+        headers=quote_headers,
+        timeout=15,
+    )
 
-        log.info("Jupiter swap status: %s", swap_resp.status_code)
+    if quote_res.status_code != 200:
+        raise Exception(f"Quote failed: {quote_res.text}")
 
-        if swap_resp.status_code == 401:
-            log.error("Jupiter SWAP 401 Unauthorized. Body: %s", swap_resp.text[:300])
-            return {"success": False, "signature": None, "error": "Jupiter 401 Unauthorized (swap)"}
+    quote_json = quote_res.json()
 
-        swap_resp.raise_for_status()
-        swap_data = swap_resp.json()
+    # 2. GET SWAP TX
+    swap_payload = {
+        "quoteResponse": quote_json,
+        "userPublicKey": user_pubkey,
+        "wrapAndUnwrapSol": True,
+    }
 
-        tx_b64 = swap_data.get("swapTransaction")
-        if not tx_b64:
-            return {"success": False, "signature": None, "error": f"No swapTransaction returned: {str(swap_data)[:300]}"}
+    swap_headers = {
+        "Content-Type": "application/json",
+        "x-api-key": jupiter_api_key,
+    }
 
-        # ---- STEP 3: SIGN (CORRECT WAY) ----
-        tx_bytes = base64.b64decode(tx_b64)
-        vt = VersionedTransaction.from_bytes(tx_bytes)
+    swap_res = requests.post(
+        JUPITER_SWAP_URL,
+        headers=swap_headers,
+        json=swap_payload,
+        timeout=20,
+    )
 
-        # Sign the message bytes
-        sig = wallet.sign_message(bytes(vt.message))
+    if swap_res.status_code != 200:
+        raise Exception(f"Swap failed: {swap_res.text}")
 
-        # Populate with our signature
-        signed_vt = VersionedTransaction.populate(vt.message, [sig])
-        raw_tx = bytes(signed_vt)
+    swap_json = swap_res.json()
 
-        # ---- STEP 4: SEND ----
-        send_result = rpc_call("sendTransaction", [
-            base64.b64encode(raw_tx).decode(),
-            {
-                "encoding": "base64",
-                "skipPreflight": False,
-                "maxRetries": 3
-            }
-        ])
+    if "swapTransaction" not in swap_json:
+        raise Exception("No swapTransaction returned from Jupiter.")
 
-        signature = send_result.get("result")
-        if not signature:
-            return {"success": False, "signature": None, "error": f"No signature returned: {send_result}"}
+    swap_tx_b64 = swap_json["swapTransaction"]
 
-        # ---- STEP 5: CONFIRM ----
-        confirmed = wait_for_confirmation(signature)
+    # 3. DESERIALIZE
+    tx_bytes = base64.b64decode(swap_tx_b64)
+    versioned_tx = VersionedTransaction.from_bytes(tx_bytes)
 
-        if confirmed:
-            return {"success": True, "signature": signature, "error": None}
-        else:
-            return {"success": False, "signature": signature, "error": "Transaction not confirmed"}
+    # 4. SIGN
+    signed_tx = VersionedTransaction(versioned_tx.message, [kp])
+    raw_signed_tx = bytes(signed_tx)
 
-    except requests.exceptions.HTTPError as e:
-        # Include short response text if available
-        resp = getattr(e, "response", None)
-        body = ""
-        if resp is not None:
-            body = resp.text[:300]
-        return {"success": False, "signature": None, "error": f"{str(e)} | body={body}"}
+    # 5. SEND TO RPC
+    rpc_payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "sendRawTransaction",
+        "params": [
+            base64.b64encode(raw_signed_tx).decode(),
+            {"skipPreflight": False}
+        ],
+    }
 
-    except Exception as e:
-        return {"success": False, "signature": None, "error": str(e)}
+    rpc_res = requests.post(rpc_url, json=rpc_payload, timeout=20)
 
+    if rpc_res.status_code != 200:
+        raise Exception(f"RPC send failed: {rpc_res.text}")
 
-# ============================================================
-# BUY / SELL
-# ============================================================
+    rpc_json = rpc_res.json()
 
-def buy_token(mint_address, sol_amount):
-    if not is_live_trading_enabled():
-        return {"success": False, "signature": None, "error": "Live trading disabled"}
+    if "error" in rpc_json:
+        raise Exception(f"RPC error: {rpc_json['error']}")
 
-    wallet = load_wallet()
-    lamports = int(sol_amount * LAMPORTS_PER_SOL)
+    txid = rpc_json["result"]
+    log.info(f"Transaction submitted: {txid}")
 
-    return jupiter_swap(SOL_MINT, mint_address, lamports, wallet)
-
-
-def sell_token(mint_address):
-    if not is_live_trading_enabled():
-        return {"success": False, "signature": None, "error": "Live trading disabled"}
-
-    wallet = load_wallet()
-
-    # get token balance (raw)
-    token_accounts = rpc_call("getTokenAccountsByOwner", [
-        str(wallet.pubkey()),
-        {"mint": mint_address},
-        {"encoding": "jsonParsed"}
-    ])
-
-    accounts = token_accounts["result"]["value"]
-    if not accounts:
-        return {"success": False, "signature": None, "error": "No tokens to sell"}
-
-    amount = int(accounts[0]["account"]["data"]["parsed"]["info"]["tokenAmount"]["amount"])
-
-    return jupiter_swap(mint_address, SOL_MINT, amount, wallet)
-
-
-# ============================================================
-# WALLET SUMMARY
-# ============================================================
-
-def get_wallet_summary():
-    try:
-        wallet = load_wallet()
-        balance_data = rpc_call("getBalance", [str(wallet.pubkey())])
-        balance = balance_data["result"]["value"] / LAMPORTS_PER_SOL
-
-        return {
-            "address": str(wallet.pubkey()),
-            "balance_sol": round(balance, 4),
-            "live_trading": is_live_trading_enabled(),
-            "max_per_trade": get_max_sol_per_trade(),
-            "has_jupiter_key": bool(get_jupiter_api_key()),
-        }
-
-    except Exception as e:
-        return {"error": str(e)}
+    return txid
