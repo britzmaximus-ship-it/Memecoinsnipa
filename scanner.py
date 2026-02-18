@@ -25,6 +25,10 @@ AGE_MAX_MINUTES = env_int("AGE_MAX_MINUTES", 720)
 
 MAX_CANDIDATES_RANK = env_int("MAX_CANDIDATES_RANK", 40)
 
+# New quality gates (enforced)
+MIN_ACCEL = env_float("MIN_ACCEL", 1.1)     # require real volume acceleration
+MIN_SCORE = env_float("MIN_SCORE", 0.15)    # require positive edge setups
+
 PAPER_TRADING_ENABLED = env_bool("PAPER_TRADING_ENABLED", True)
 PAPER_MAX_OPEN = env_int("PAPER_MAX_OPEN", 6)
 
@@ -42,12 +46,12 @@ LIVE_STOP_LOSS_PCT = env_float("LIVE_STOP_LOSS_PCT", -25.0)
 LIVE_TRAIL_DROP_PCT = env_float("LIVE_TRAIL_DROP_PCT", 18.0)
 LIVE_MAX_HOLD_MIN = env_int("LIVE_MAX_HOLD_MIN", 240)
 
-# Partial take profits (B)
-LIVE_TP1_PCT = env_float("LIVE_TP1_PCT", 25.0)              # trigger +25%
-LIVE_TP1_SELL_FRAC = env_float("LIVE_TP1_SELL_FRAC", 0.40)  # sell 40% balance
+# Partial take profits
+LIVE_TP1_PCT = env_float("LIVE_TP1_PCT", 25.0)
+LIVE_TP1_SELL_FRAC = env_float("LIVE_TP1_SELL_FRAC", 0.40)
 
-LIVE_TP2_PCT = env_float("LIVE_TP2_PCT", 60.0)              # trigger +60%
-LIVE_TP2_SELL_FRAC = env_float("LIVE_TP2_SELL_FRAC", 0.30)  # sell 30% balance
+LIVE_TP2_PCT = env_float("LIVE_TP2_PCT", 60.0)
+LIVE_TP2_SELL_FRAC = env_float("LIVE_TP2_SELL_FRAC", 0.30)
 
 # Kill switches
 DAILY_LOSS_LIMIT_SOL = env_float("DAILY_LOSS_LIMIT_SOL", 0.15)
@@ -79,6 +83,12 @@ def filter_candidate(c: Dict[str, Any]) -> bool:
         return False
     if liq_to_mc < MIN_LIQ_TO_MC:
         return False
+
+    # Momentum gate: require acceleration
+    accel = _num(c.get("vol_accel"), 0.0)
+    if accel < MIN_ACCEL:
+        return False
+
     return True
 
 
@@ -96,6 +106,7 @@ def score_candidate(store: Storage, c: Dict[str, Any]) -> float:
     sells = int(c.get("sells_1h", 0) or 0)
     bp = buys / max(1, sells)
 
+    # Normalize-ish
     accel_n = min(1.0, max(0.0, (accel - 0.6) / 3.0))
     liq_n = min(1.0, max(0.0, (liq - 20000.0) / 180000.0))
 
@@ -184,121 +195,11 @@ def run_forever():
             opened_msgs: List[str] = []
             update_msgs: List[str] = []
 
-            # -----------------------
-            # A) Monitor open LIVE positions -> partial exits + trailing + SL/time
-            # -----------------------
-            open_live = store.state.get("open_live_positions") or []
-            still_open: List[Dict[str, Any]] = []
-
-            for pos in open_live:
-                mint = pos.get("mint")
-                if not mint:
-                    continue
-
-                tok = dex.get_token(mint)
-                price = _num(tok.get("price"), 0.0)
-                if price <= 0:
-                    still_open.append(pos)
-                    continue
-
-                entry = _num(pos.get("entry_price"), 0.0)
-                pnl = _pnl_pct(entry, price)
-                pos["last_price"] = price
-                pos["pnl_pct"] = pnl
-                pos["peak_pnl_pct"] = max(_num(pos.get("peak_pnl_pct"), 0.0), pnl)
-                stage = int(pos.get("stage", 0))
-                age_min = int((time.time() - int(pos.get("entry_ts", int(time.time())))) / 60)
-
-                # Hard exits (sell all)
-                hard_reason = None
-                if pnl <= LIVE_STOP_LOSS_PCT:
-                    hard_reason = "stop_loss"
-                elif age_min >= LIVE_MAX_HOLD_MIN:
-                    hard_reason = "time_exit"
-                else:
-                    # trailing after some gains
-                    peak = _num(pos.get("peak_pnl_pct"), 0.0)
-                    if peak >= 10.0 and (peak - pnl) >= LIVE_TRAIL_DROP_PCT:
-                        hard_reason = "trail_exit"
-
-                if hard_reason and live_env:
-                    res = sell_token(mint)
-                    store.state.setdefault("live_trades", []).append({
-                        "ts": int(time.time()),
-                        "mint": mint,
-                        "type": "SELL_ALL",
-                        "reason": hard_reason,
-                        "result": res,
-                        "pnl_est_pct": pnl,
-                    })
-                    update_msgs.append(
-                        f"Live sell-all {mint[:6]} reason={hard_reason} success={res.get('success')} pnl_est={pnl:.2f}%"
-                    )
-
-                    if pnl < 0:
-                        lr["consec_losses"] = int(lr.get("consec_losses", 0)) + 1
-                        lr["loss_sol"] = float(lr.get("loss_sol", 0.0)) + float(LIVE_SOL_PER_TRADE)
-                    else:
-                        lr["consec_losses"] = 0
-
-                    continue  # closed
-
-                # Partial exits (TP1, TP2) - only if still live-enabled
-                did_partial = False
-                if live_env:
-                    if stage == 0 and pnl >= LIVE_TP1_PCT:
-                        res = sell_token_pct(mint, LIVE_TP1_SELL_FRAC)
-                        store.state.setdefault("live_trades", []).append({
-                            "ts": int(time.time()),
-                            "mint": mint,
-                            "type": "SELL_PARTIAL",
-                            "reason": "tp1",
-                            "pct": LIVE_TP1_SELL_FRAC,
-                            "result": res,
-                            "pnl_est_pct": pnl,
-                        })
-                        pos["stage"] = 1
-                        did_partial = True
-                        update_msgs.append(
-                            f"Live TP1 partial {mint[:6]} sell={LIVE_TP1_SELL_FRAC:.2f} success={res.get('success')} pnl_est={pnl:.2f}%"
-                        )
-
-                    elif stage == 1 and pnl >= LIVE_TP2_PCT:
-                        res = sell_token_pct(mint, LIVE_TP2_SELL_FRAC)
-                        store.state.setdefault("live_trades", []).append({
-                            "ts": int(time.time()),
-                            "mint": mint,
-                            "type": "SELL_PARTIAL",
-                            "reason": "tp2",
-                            "pct": LIVE_TP2_SELL_FRAC,
-                            "result": res,
-                            "pnl_est_pct": pnl,
-                        })
-                        pos["stage"] = 2
-                        did_partial = True
-                        update_msgs.append(
-                            f"Live TP2 partial {mint[:6]} sell={LIVE_TP2_SELL_FRAC:.2f} success={res.get('success')} pnl_est={pnl:.2f}%"
-                        )
-
-                # Keep position open after partials; trailing handles the rest
-                # (Optional improvement later: if stage==2 and pnl collapses, exit remainder faster)
-                if did_partial:
-                    # After partial profit taking, reset loss streak
-                    lr["consec_losses"] = 0
-
-                still_open.append(pos)
-
-            store.state["open_live_positions"] = still_open
-
-            # -----------------------
-            # B) Monitor open PAPER trades -> close & learn
-            # -----------------------
-            open_papers = store.get_open_paper_trades()
-            for t in open_papers:
+            # Monitor PAPER trades (learning comes from closures)
+            for t in store.get_open_paper_trades():
                 mint = t.get("mint")
                 if not mint:
                     continue
-
                 tok = dex.get_token(mint)
                 price = _num(tok.get("price"), 0.0)
                 if price <= 0:
@@ -310,11 +211,10 @@ def run_forever():
                     win, pnl2 = store.close_paper_trade(t["id"], price, reason)
                     update_msgs.append(f"Paper closed {t['id']} pnl={pnl2:.2f}% reason={reason} win={win}")
 
-            # -----------------------
-            # C) Discover + rank
-            # -----------------------
+            # Discovery
             discovered = discover_solana_candidates(limit=DISCOVERY_LIMIT)
 
+            # Filter + score
             candidates: List[Dict[str, Any]] = []
             for c in discovered:
                 mint = c.get("mint")
@@ -328,18 +228,16 @@ def run_forever():
                     candidates.append(c)
 
             candidates.sort(key=lambda x: _num(x.get("score"), 0.0), reverse=True)
-            ranked = candidates[:MAX_CANDIDATES_RANK]
 
-            # -----------------------
-            # D) Open paper trade + maybe mirror live buy
-            # -----------------------
+            # Enforce MIN_SCORE
+            ranked = [c for c in candidates if _num(c.get("score"), 0.0) >= MIN_SCORE]
+            ranked = ranked[:MAX_CANDIDATES_RANK]
+
+            # Open 1 paper per scan (quality gated)
             if ranked and should_open_new_paper(store):
                 top = ranked[0]
                 mint = top["mint"]
-
                 already_open_paper = any(t.get("mint") == mint for t in store.get_open_paper_trades())
-                already_open_live = any(p.get("mint") == mint for p in (store.state.get("open_live_positions") or []))
-
                 if not already_open_paper:
                     tok = dex.get_token(mint)
                     price = _num(tok.get("price"), 0.0)
@@ -358,10 +256,13 @@ def run_forever():
                             "buckets": top.get("buckets"),
                         }
                         tid = store.open_paper_trade(mint, price, meta)
-                        opened_msgs.append(f"Paper opened {tid} {mint[:6]} score={_num(top.get('score'),0):.3f} price={price}")
+                        opened_msgs.append(
+                            f"Paper opened {tid} {mint[:6]} score={_num(top.get('score'),0):.3f} "
+                            f"age={top.get('age_min')}m liq=${_num(top.get('liq'),0):.0f} accel={_num(top.get('vol_accel'),0):.2f}"
+                        )
 
-                        # Live mirror buy (only if eligible + enabled)
-                        if LIVE_MIRROR_ENABLED and live_env and eligible and not already_open_live:
+                        # Live mirror buy only when eligible
+                        if LIVE_MIRROR_ENABLED and live_env and eligible:
                             if float(lr.get("loss_sol", 0.0)) >= DAILY_LOSS_LIMIT_SOL:
                                 opened_msgs.append("Live blocked: daily loss limit reached")
                             elif int(lr.get("consec_losses", 0)) >= MAX_CONSEC_LIVE_LOSSES:
@@ -380,30 +281,15 @@ def run_forever():
                                 })
                                 opened_msgs.append(f"Live buy attempted {mint[:6]} success={res.get('success')}")
 
-                                if res.get("success"):
-                                    store.state.setdefault("open_live_positions", []).append({
-                                        "mint": mint,
-                                        "entry_price": price,
-                                        "entry_ts": int(time.time()),
-                                        "last_price": price,
-                                        "pnl_pct": 0.0,
-                                        "peak_pnl_pct": 0.0,
-                                        "stage": 0,
-                                        "source_paper_trade": tid,
-                                    })
-
             store.save()
 
-            # -----------------------
-            # E) Telegram status
-            # -----------------------
+            # Telegram status
             lines = [
                 f"Scan #{scan_id}",
                 f"Paper: open={len(store.get_open_paper_trades())} closed={(store.state.get('stats') or {}).get('paper', {}).get('closed', 0)}",
-                f"Live: open={len(store.state.get('open_live_positions') or [])} eligible={eligible} env={is_live_trading_enabled()} mirror={LIVE_MIRROR_ENABLED}",
                 f"Gate: {gate.get('reason')}",
-                f"Risk: daily_loss_sol={_num(lr.get('loss_sol'),0):.3f} consec_losses={int(lr.get('consec_losses',0))}",
-                f"Wallet: {wallet.get('balance_sol')} SOL",
+                f"Wallet: {wallet.get('balance_sol')} SOL live_env={is_live_trading_enabled()} mirror={LIVE_MIRROR_ENABLED}",
+                f"Quality: MIN_ACCEL={MIN_ACCEL} MIN_SCORE={MIN_SCORE}",
                 f"Candidates: discovered={len(discovered)} filtered={len(candidates)} ranked={len(ranked)}",
             ]
 
