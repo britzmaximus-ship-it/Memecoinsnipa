@@ -64,7 +64,7 @@ API_TIMEOUT = 10                      # Default API timeout in seconds
 GROQ_TIMEOUT_STAGE1 = 60              # Timeout for Stage 1 (short prompt)
 GROQ_TIMEOUT_STAGE2 = 120             # Timeout for Stage 2 (long prompt)
 GROQ_TIMEOUT_RULES = 90               # Timeout for rule evolution
-GROQ_MAX_TOKENS_STAGE1 = 800          # Max output tokens for Stage 1 (small JSON output; reduces rate limits)
+GROQ_MAX_TOKENS_STAGE1 = 400          # Max output tokens for Stage 1 (small JSON output; reduces rate limits)
 GROQ_MAX_TOKENS_STAGE2 = 4096         # Max output tokens for Stage 2
 
 # -- Telegram --
@@ -969,7 +969,7 @@ GROQ_MODEL_CHAIN = [
 # ============================================================
 # If Groq returns 429, we pause LLM calls for a short cooldown window
 # to avoid cascading rate limits across every fallback model.
-GROQ_COOLDOWN_SECONDS = int(os.environ.get("GROQ_COOLDOWN_SECONDS", "300"))  # default 5 minutes
+GROQ_COOLDOWN_SECONDS = int(os.environ.get("GROQ_COOLDOWN_SECONDS", "600"))  # default 5 minutes
 _groq_disabled_until: float = 0.0
 _last_successful_model: str | None = None
 _groq_model_index: int = 0
