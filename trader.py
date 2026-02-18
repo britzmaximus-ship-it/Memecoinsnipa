@@ -7,7 +7,7 @@ Exports:
 - get_wallet_summary()
 - is_live_trading_enabled()
 
-Implements Jupiter Swap API v1 (api.jup.ag) + solders signing.
+Uses Jupiter v6 public endpoints + solders signing.
 Robust wallet loading across env var names and key formats.
 """
 
@@ -29,8 +29,9 @@ if not log.handlers:
 LAMPORTS_PER_SOL = 1_000_000_000
 SOL_MINT = "So11111111111111111111111111111111111111112"
 
-JUPITER_QUOTE_URL = "https://api.jup.ag/swap/v1/quote"
-JUPITER_SWAP_URL = "https://api.jup.ag/swap/v1/swap"
+# ✅ Use Jupiter public v6 endpoints (avoids your 401 issues)
+JUPITER_QUOTE_URL = "https://quote-api.jup.ag/v6/quote"
+JUPITER_SWAP_URL = "https://quote-api.jup.ag/v6/swap"
 
 CONFIRM_TIMEOUT = 60
 DEFAULT_SLIPPAGE_BPS = 2500
@@ -40,28 +41,28 @@ DEFAULT_SLIPPAGE_BPS = 2500
 # ENV HELPERS
 # ============================================================
 
-def is_live_trading_enabled():
-    return os.environ.get("LIVE_TRADING_ENABLED", "false").lower() == "true"
+def env_bool(name: str, default: bool = False) -> bool:
+    v = os.getenv(name)
+    if v is None:
+        return default
+    return v.strip().lower() in ("1", "true", "yes", "y", "on")
 
 
-def get_max_sol_per_trade():
+def is_live_trading_enabled() -> bool:
+    return env_bool("LIVE_TRADING_ENABLED", False)
+
+
+def get_max_sol_per_trade() -> float:
     return float(os.environ.get("MAX_SOL_PER_TRADE", "0.03"))
 
 
-def get_rpc_url():
+def get_rpc_url() -> str:
     return os.environ.get("SOLANA_RPC_URL", "").strip()
 
 
-def get_jupiter_api_key():
-    return os.environ.get("JUPITER_API_KEY", "").strip()
-
-
+# ✅ For public v6 endpoints, we don't need an API key header
 def jupiter_headers():
-    headers = {"accept": "application/json"}
-    key = get_jupiter_api_key()
-    if key:
-        headers["x-api-key"] = key
-    return headers
+    return {"accept": "application/json"}
 
 
 # ============================================================
@@ -69,13 +70,6 @@ def jupiter_headers():
 # ============================================================
 
 def _read_private_key_string() -> str:
-    """
-    Tries multiple env var names so GitHub/Railway/local all work without edits.
-    Priority order:
-      1) SOLANA_PRIVATE_KEY  (what your scan.yml uses)
-      2) WALLET_PRIVATE_KEY_BASE58
-      3) WALLET_PRIVATE_KEY
-    """
     pk = (
         os.environ.get("SOLANA_PRIVATE_KEY")
         or os.environ.get("WALLET_PRIVATE_KEY_BASE58")
@@ -90,27 +84,19 @@ def _read_private_key_string() -> str:
 
 
 def load_wallet() -> Keypair:
-    """
-    Supports:
-      - Base58 encoded key (32-byte seed or 64-byte secret)
-      - JSON array (Solana CLI style) of 64 numbers
-    """
     pk = _read_private_key_string()
 
-    # JSON array (Solana CLI keypair file contents pasted into env)
     if pk.startswith("["):
         key_bytes = bytes(json.loads(pk))
     else:
         key_bytes = base58.b58decode(pk)
 
     if len(key_bytes) == 64:
-        kp = Keypair.from_bytes(key_bytes)
-    elif len(key_bytes) == 32:
-        kp = Keypair.from_seed(key_bytes)
-    else:
-        raise ValueError(f"Unexpected key length: {len(key_bytes)} bytes")
+        return Keypair.from_bytes(key_bytes)
+    if len(key_bytes) == 32:
+        return Keypair.from_seed(key_bytes)
 
-    return kp
+    raise ValueError(f"Unexpected key length: {len(key_bytes)} bytes")
 
 
 # ============================================================
@@ -158,12 +144,12 @@ def jupiter_swap(input_mint: str, output_mint: str, amount: int, wallet: Keypair
       - If input is token: raw token units (already decimals-adjusted)
     """
     try:
-        # 1) QUOTE
+        # 1) QUOTE (v6)
         quote_params = {
             "inputMint": input_mint,
             "outputMint": output_mint,
-            "amount": str(amount),
-            "slippageBps": str(slippage_bps),
+            "amount": int(amount),
+            "slippageBps": int(slippage_bps),
             "swapMode": "ExactIn",
         }
 
@@ -173,14 +159,10 @@ def jupiter_swap(input_mint: str, output_mint: str, amount: int, wallet: Keypair
             headers=jupiter_headers(),
             timeout=20,
         )
-
-        if quote_resp.status_code == 401:
-            return {"success": False, "signature": None, "error": "Jupiter 401 Unauthorized (quote)"}
-
         quote_resp.raise_for_status()
         quote = quote_resp.json()
 
-        # 2) SWAP TX
+        # 2) SWAP TX (v6)
         swap_payload = {
             "quoteResponse": quote,
             "userPublicKey": str(wallet.pubkey()),
@@ -193,10 +175,6 @@ def jupiter_swap(input_mint: str, output_mint: str, amount: int, wallet: Keypair
             headers=jupiter_headers(),
             timeout=20,
         )
-
-        if swap_resp.status_code == 401:
-            return {"success": False, "signature": None, "error": "Jupiter 401 Unauthorized (swap)"}
-
         swap_resp.raise_for_status()
         swap_data = swap_resp.json()
 
@@ -244,7 +222,9 @@ def jupiter_swap(input_mint: str, output_mint: str, amount: int, wallet: Keypair
 # ============================================================
 
 def buy_token(mint_address: str, sol_amount: float):
-    if not is_live_trading_enabled():
+    live = is_live_trading_enabled()
+    log.info(f"[TRADER] BUY request mint={mint_address} sol={sol_amount} live={live}")
+    if not live:
         return {"success": False, "signature": None, "error": "Live trading disabled"}
 
     wallet = load_wallet()
@@ -253,7 +233,9 @@ def buy_token(mint_address: str, sol_amount: float):
 
 
 def sell_token(mint_address: str):
-    if not is_live_trading_enabled():
+    live = is_live_trading_enabled()
+    log.info(f"[TRADER] SELL request mint={mint_address} live={live}")
+    if not live:
         return {"success": False, "signature": None, "error": "Live trading disabled"}
 
     wallet = load_wallet()
@@ -286,7 +268,7 @@ def get_wallet_summary():
             "balance_sol": round(balance, 6),
             "live_trading": is_live_trading_enabled(),
             "max_per_trade": get_max_sol_per_trade(),
-            "has_jupiter_key": bool(get_jupiter_api_key()),
+            "rpc_set": bool(get_rpc_url()),
         }
     except Exception as e:
         return {"error": str(e)}
