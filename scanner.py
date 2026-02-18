@@ -992,6 +992,9 @@ GROQ_MODEL_CHAIN = [
 # Optional:
 # - GROQ_COOLDOWN_SECONDS (already supported)
 # - LLM_PROVIDER_COOLDOWN_SECONDS (default 600) for non-Groq providers
+
+LLM_MIN_SECONDS_BETWEEN_CALLS = int(os.environ.get("LLM_MIN_SECONDS_BETWEEN_CALLS", "600"))
+_last_llm_call_time = 0.0
 # - OPENROUTER_BASE_URL / TOGETHER_BASE_URL / FIREWORKS_BASE_URL (advanced)
 
 LLM_PROVIDER_COOLDOWN_SECONDS = int(os.environ.get("LLM_PROVIDER_COOLDOWN_SECONDS", "600"))
@@ -1056,6 +1059,15 @@ def call_llm(system: str, prompt: str, temperature: float = 0.8,
     global _last_groq_error, _provider_index, _last_provider_used
 
     now = time.time()
+
+global _last_llm_call_time
+
+# Enforce minimum spacing between ANY LLM calls
+if now - _last_llm_call_time < LLM_MIN_SECONDS_BETWEEN_CALLS:
+    remaining = int(LLM_MIN_SECONDS_BETWEEN_CALLS - (now - _last_llm_call_time))
+    log.info(f"LLM global cooldown active ({remaining}s remaining). Skipping Stage 1.")
+    return None
+
     prompt_len = len(system) + len(prompt)
     log.info(f"LLM call: prompt_len={prompt_len}, max_tokens={max_tokens}, timeout={timeout}s")
 
@@ -1129,8 +1141,11 @@ def call_llm(system: str, prompt: str, temperature: float = 0.8,
 
         data = resp.json()
         content = data["choices"][0]["message"]["content"]
-        _last_provider_used = provider_name
-        return content
+        
+_last_provider_used = provider_name
+_last_llm_call_time = now
+return content
+
 
     except requests.exceptions.Timeout:
         _last_groq_error = f"{provider_name}:{model} Timeout after {timeout}s"
