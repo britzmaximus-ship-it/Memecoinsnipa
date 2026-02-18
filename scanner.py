@@ -976,25 +976,82 @@ _groq_model_index: int = 0
 
 
 
-def call_groq(system: str, prompt: str, temperature: float = 0.8,
-              timeout: int = GROQ_TIMEOUT_STAGE1, max_tokens: int = GROQ_MAX_TOKENS_STAGE2) -> Optional[str]:
-    """Call Groq API with strong rate-limit protection.
 
-    Key behaviors:
-    - Only tries ONE model per cycle (prevents hammering every fallback model).
-    - On HTTP 429, enters a cooldown window (default 5 minutes).
-    - Rotates to the next model AFTER a 429, but not in the same cycle.
+def call_groq(system: str, prompt: str, temperature: float = 0.8,
+              timeout: int = GROQ_TIMEOUT_STAGE1,
+              max_tokens: int = GROQ_MAX_TOKENS_STAGE2) -> Optional[str]:
     """
+    Call Groq API with strong rate-limit protection.
+    """
+
     global _last_groq_error, _groq_disabled_until, _last_successful_model, _groq_model_index
 
     now = time.time()
 
-    # â Cooldown active: skip this cycle
+    # Cooldown check
     if now < _groq_disabled_until:
         remaining = int(_groq_disabled_until - now)
         _last_groq_error = f"Groq cooldown active ({remaining}s remaining)"
         log.warning(f"Groq in cooldown â skipping LLM this cycle ({remaining}s left).")
         return None
+
+    prompt_len = len(system) + len(prompt)
+    log.info(f"Groq call: prompt_len={prompt_len}, max_tokens={max_tokens}, timeout={timeout}s")
+
+    if _last_successful_model and _last_successful_model in GROQ_MODEL_CHAIN:
+        model_to_try = _last_successful_model
+    else:
+        model_to_try = GROQ_MODEL_CHAIN[_groq_model_index % len(GROQ_MODEL_CHAIN)]
+
+    try:
+        log.info(f"Trying model: {model_to_try}")
+
+        resp = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": model_to_try,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            },
+            timeout=timeout,
+        )
+
+        if resp.status_code == 429:
+            _groq_model_index = (_groq_model_index + 1) % len(GROQ_MODEL_CHAIN)
+            _groq_disabled_until = now + GROQ_COOLDOWN_SECONDS
+            _last_groq_error = f"{model_to_try}: rate limited"
+            log.warning(f"Groq rate limited. Cooldown {GROQ_COOLDOWN_SECONDS}s.")
+            return None
+
+        if resp.status_code != 200:
+            _last_groq_error = f"{model_to_try} HTTP {resp.status_code}: {resp.text[:200]}"
+            log.error(f"Groq API error: {_last_groq_error}")
+            return None
+
+        result = resp.json()
+        content = result["choices"][0]["message"]["content"]
+
+        _last_successful_model = model_to_try
+        return content
+
+    except requests.exceptions.Timeout:
+        _last_groq_error = f"{model_to_try}: Timeout"
+        log.error("Groq timeout")
+        return None
+
+    except Exception as e:
+        _last_groq_error = f"{model_to_try}: {str(e)}"
+        log.error(f"Groq exception: {_last_groq_error}")
+        return None
+
 
     prompt_len = len(system) + len(prompt)
     log.info(f"Groq call: prompt_len={prompt_len}, max_tokens={max_tokens}, timeout={timeout}s")
