@@ -25,9 +25,9 @@ AGE_MAX_MINUTES = env_int("AGE_MAX_MINUTES", 720)
 
 MAX_CANDIDATES_RANK = env_int("MAX_CANDIDATES_RANK", 40)
 
-# New quality gates (enforced)
-MIN_ACCEL = env_float("MIN_ACCEL", 1.1)     # require real volume acceleration
-MIN_SCORE = env_float("MIN_SCORE", 0.15)    # require positive edge setups
+# Quality gates (enforced)
+MIN_ACCEL = env_float("MIN_ACCEL", 1.1)
+MIN_SCORE = env_float("MIN_SCORE", 0.15)
 
 PAPER_TRADING_ENABLED = env_bool("PAPER_TRADING_ENABLED", True)
 PAPER_MAX_OPEN = env_int("PAPER_MAX_OPEN", 6)
@@ -66,17 +66,36 @@ def _num(x, default=0.0) -> float:
         return default
 
 
+def _safe_age_minutes(c: Dict[str, Any]) -> Optional[int]:
+    """
+    Returns:
+      - int minutes if reasonable
+      - None if missing/invalid/absurd
+    """
+    raw = c.get("age_min", None)
+    try:
+        if raw is None:
+            return None
+        age = int(raw)
+        # Dex/data glitches sometimes produce insane ages; treat as unknown
+        if age < 0 or age > 200000:
+            return None
+        return age
+    except Exception:
+        return None
+
+
 def filter_candidate(c: Dict[str, Any]) -> bool:
-    age = int(c.get("age_min", 10**9))
+    mint = c.get("mint")
+    if not mint or len(mint) < 20:
+        return False
+
     liq = _num(c.get("liq"), 0.0)
     mc = _num(c.get("mc"), 0.0)
     liq_to_mc = _num(c.get("liq_to_mc"), 0.0)
-    mint = c.get("mint")
+    accel = _num(c.get("vol_accel"), 0.0)
 
-    if not mint or len(mint) < 20:
-        return False
-    if age < AGE_MIN_MINUTES or age > AGE_MAX_MINUTES:
-        return False
+    # Liquidity / MC filters
     if liq < MIN_LIQUIDITY_USD:
         return False
     if mc < MIN_MC_USD or mc > MAX_MC_USD:
@@ -84,9 +103,22 @@ def filter_candidate(c: Dict[str, Any]) -> bool:
     if liq_to_mc < MIN_LIQ_TO_MC:
         return False
 
-    # Momentum gate: require acceleration
-    accel = _num(c.get("vol_accel"), 0.0)
+    # Momentum gate
     if accel < MIN_ACCEL:
+        return False
+
+    # Age handling (robust)
+    age = _safe_age_minutes(c)
+    if age is None:
+        # Unknown age: allow only if "extra strong"
+        if accel < (MIN_ACCEL * 1.3):
+            return False
+        if liq < (MIN_LIQUIDITY_USD * 2.0):
+            return False
+        return True
+
+    # Normal age window
+    if age < AGE_MIN_MINUTES or age > AGE_MAX_MINUTES:
         return False
 
     return True
@@ -99,25 +131,28 @@ def score_candidate(store: Storage, c: Dict[str, Any]) -> float:
     w_age = _num(w.get("age"), 0.20)
     w_bp = _num(w.get("buy_pressure"), 0.15)
 
-    age = int(c.get("age_min", 10**9))
+    age = _safe_age_minutes(c)
     liq = _num(c.get("liq"), 0.0)
     accel = _num(c.get("vol_accel"), 0.0)
     buys = int(c.get("buys_1h", 0) or 0)
     sells = int(c.get("sells_1h", 0) or 0)
     bp = buys / max(1, sells)
 
-    # Normalize-ish
     accel_n = min(1.0, max(0.0, (accel - 0.6) / 3.0))
     liq_n = min(1.0, max(0.0, (liq - 20000.0) / 180000.0))
 
-    if age < 15:
-        age_n = 0.2
-    elif age <= 360:
-        age_n = 1.0
-    elif age <= 720:
-        age_n = 0.6
+    # If age unknown, treat as neutral-low (so it doesn’t win purely on missing data)
+    if age is None:
+        age_n = 0.4
     else:
-        age_n = 0.2
+        if age < 15:
+            age_n = 0.2
+        elif age <= 360:
+            age_n = 1.0
+        elif age <= 720:
+            age_n = 0.6
+        else:
+            age_n = 0.2
 
     bp_n = min(1.0, max(0.0, (bp - 0.8) / 2.2))
 
@@ -176,26 +211,15 @@ def run_forever():
             store.increment_scan()
             scan_id = int(store.state.get("scans", 0))
 
-            today = time.strftime("%Y-%m-%d")
-            lr = store.state.setdefault("live_risk", {"day": today, "loss_sol": 0.0, "consec_losses": 0})
-            if lr.get("day") != today:
-                lr["day"] = today
-                lr["loss_sol"] = 0.0
-                lr["consec_losses"] = 0
-
             wallet = get_wallet_summary()
             live_env = is_live_trading_enabled()
             gate = store.evaluate_live_gate()
             eligible = bool(gate.get("eligible"))
 
-            bal = wallet.get("balance_sol")
-            if bal is not None and _num(bal, 0.0) < EMERGENCY_STOP_SOL_BAL:
-                live_env = False
-
             opened_msgs: List[str] = []
             update_msgs: List[str] = []
 
-            # Monitor PAPER trades (learning comes from closures)
+            # Paper monitoring
             for t in store.get_open_paper_trades():
                 mint = t.get("mint")
                 if not mint:
@@ -211,10 +235,8 @@ def run_forever():
                     win, pnl2 = store.close_paper_trade(t["id"], price, reason)
                     update_msgs.append(f"Paper closed {t['id']} pnl={pnl2:.2f}% reason={reason} win={win}")
 
-            # Discovery
             discovered = discover_solana_candidates(limit=DISCOVERY_LIMIT)
 
-            # Filter + score
             candidates: List[Dict[str, Any]] = []
             for c in discovered:
                 mint = c.get("mint")
@@ -229,11 +251,9 @@ def run_forever():
 
             candidates.sort(key=lambda x: _num(x.get("score"), 0.0), reverse=True)
 
-            # Enforce MIN_SCORE
             ranked = [c for c in candidates if _num(c.get("score"), 0.0) >= MIN_SCORE]
             ranked = ranked[:MAX_CANDIDATES_RANK]
 
-            # Open 1 paper per scan (quality gated)
             if ranked and should_open_new_paper(store):
                 top = ranked[0]
                 mint = top["mint"]
@@ -261,35 +281,14 @@ def run_forever():
                             f"age={top.get('age_min')}m liq=${_num(top.get('liq'),0):.0f} accel={_num(top.get('vol_accel'),0):.2f}"
                         )
 
-                        # Live mirror buy only when eligible
-                        if LIVE_MIRROR_ENABLED and live_env and eligible:
-                            if float(lr.get("loss_sol", 0.0)) >= DAILY_LOSS_LIMIT_SOL:
-                                opened_msgs.append("Live blocked: daily loss limit reached")
-                            elif int(lr.get("consec_losses", 0)) >= MAX_CONSEC_LIVE_LOSSES:
-                                opened_msgs.append("Live blocked: consecutive loss limit reached")
-                            elif len(store.state.get("open_live_positions") or []) >= MAX_OPEN_LIVE_TRADES:
-                                opened_msgs.append("Live blocked: max open live trades reached")
-                            else:
-                                res = buy_token(mint, LIVE_SOL_PER_TRADE)
-                                store.state.setdefault("live_trades", []).append({
-                                    "ts": int(time.time()),
-                                    "mint": mint,
-                                    "type": "BUY",
-                                    "sol": LIVE_SOL_PER_TRADE,
-                                    "result": res,
-                                    "source_paper_trade": tid,
-                                })
-                                opened_msgs.append(f"Live buy attempted {mint[:6]} success={res.get('success')}")
-
             store.save()
 
-            # Telegram status
             lines = [
                 f"Scan #{scan_id}",
                 f"Paper: open={len(store.get_open_paper_trades())} closed={(store.state.get('stats') or {}).get('paper', {}).get('closed', 0)}",
                 f"Gate: {gate.get('reason')}",
                 f"Wallet: {wallet.get('balance_sol')} SOL live_env={is_live_trading_enabled()} mirror={LIVE_MIRROR_ENABLED}",
-                f"Quality: MIN_ACCEL={MIN_ACCEL} MIN_SCORE={MIN_SCORE}",
+                f"Quality: MIN_ACCEL={MIN_ACCEL} MIN_SCORE={MIN_SCORE} age={AGE_MIN_MINUTES}-{AGE_MAX_MINUTES}m",
                 f"Candidates: discovered={len(discovered)} filtered={len(candidates)} ranked={len(ranked)}",
             ]
 
