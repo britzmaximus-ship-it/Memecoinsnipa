@@ -156,9 +156,6 @@ BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 USER_ID = os.environ.get("TELEGRAM_USER_ID", "")
 GROQ_KEY = os.environ.get("GROQ_API_KEY", "")
 OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-TOGETHER_KEY = os.environ.get("TOGETHER_API_KEY", "")
-FIREWORKS_KEY = os.environ.get("FIREWORKS_API_KEY", "")
-
 TAPI = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 
@@ -170,9 +167,9 @@ _missing_vars = [
 ]
 
 # Need at least one LLM provider key (Groq or backups)
-_llm_keys_present = any([GROQ_KEY, OPENROUTER_KEY, TOGETHER_KEY, FIREWORKS_KEY])
+_llm_keys_present = any([GROQ_KEY, OPENROUTER_KEY])
 if not _llm_keys_present:
-    _missing_vars.append("GROQ_API_KEY or OPENROUTER_API_KEY or TOGETHER_API_KEY or FIREWORKS_API_KEY")
+    _missing_vars.append("GROQ_API_KEY or OPENROUTER_API_KEY")
 
 if _missing_vars:
     raise EnvironmentError(f"Missing required environment variables: {', '.join(_missing_vars)}")
@@ -1000,27 +997,24 @@ GROQ_MODEL_CHAIN = [
 LLM_PROVIDER_COOLDOWN_SECONDS = int(os.environ.get("LLM_PROVIDER_COOLDOWN_SECONDS", "600"))
 
 OPENROUTER_BASE_URL = os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").rstrip("/")
-TOGETHER_BASE_URL = os.environ.get("TOGETHER_BASE_URL", "https://api.together.xyz/v1").rstrip("/")
-FIREWORKS_BASE_URL = os.environ.get("FIREWORKS_BASE_URL", "https://api.fireworks.ai/inference/v1").rstrip("/")
+
+
 GROQ_BASE_URL = os.environ.get("GROQ_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/")
 
 GROQ_MODEL_PRIMARY = os.environ.get("GROQ_MODEL_PRIMARY", GROQ_MODEL_CHAIN[0])
 OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "meta-llama/llama-3.1-8b-instruct")
-TOGETHER_MODEL = os.environ.get("TOGETHER_MODEL", "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo")
-FIREWORKS_MODEL = os.environ.get("FIREWORKS_MODEL", "accounts/fireworks/models/llama-v3p1-8b-instruct")
+
+
+
 
 LLM_PROVIDERS = [
     {"name": "groq", "base_url": GROQ_BASE_URL, "key": lambda: GROQ_KEY, "model": lambda: GROQ_MODEL_PRIMARY, "cooldown": lambda: GROQ_COOLDOWN_SECONDS},
     {"name": "openrouter", "base_url": OPENROUTER_BASE_URL, "key": lambda: OPENROUTER_KEY, "model": lambda: OPENROUTER_MODEL, "cooldown": lambda: LLM_PROVIDER_COOLDOWN_SECONDS},
-    {"name": "together", "base_url": TOGETHER_BASE_URL, "key": lambda: TOGETHER_KEY, "model": lambda: TOGETHER_MODEL, "cooldown": lambda: LLM_PROVIDER_COOLDOWN_SECONDS},
-    {"name": "fireworks", "base_url": FIREWORKS_BASE_URL, "key": lambda: FIREWORKS_KEY, "model": lambda: FIREWORKS_MODEL, "cooldown": lambda: LLM_PROVIDER_COOLDOWN_SECONDS},
 ]
 
 _provider_disabled_until = {p["name"]: 0.0 for p in LLM_PROVIDERS}
 _provider_index = 0  # rotates start provider across cycles
 _last_provider_used = None
-
-
 
 # ============================================================
 # GROQ RATE LIMIT PROTECTION STATE
