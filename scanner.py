@@ -155,15 +155,25 @@ if not TRADER_AVAILABLE:
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 USER_ID = os.environ.get("TELEGRAM_USER_ID", "")
 GROQ_KEY = os.environ.get("GROQ_API_KEY", "")
+OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+TOGETHER_KEY = os.environ.get("TOGETHER_API_KEY", "")
+FIREWORKS_KEY = os.environ.get("FIREWORKS_API_KEY", "")
+
 TAPI = f"https://api.telegram.org/bot{BOT_TOKEN}"
+
 
 _missing_vars = [
     name for name, val in [
         ("TELEGRAM_BOT_TOKEN", BOT_TOKEN),
         ("TELEGRAM_USER_ID", USER_ID),
-        ("GROQ_API_KEY", GROQ_KEY),
     ] if not val
 ]
+
+# Need at least one LLM provider key (Groq or backups)
+_llm_keys_present = any([GROQ_KEY, OPENROUTER_KEY, TOGETHER_KEY, FIREWORKS_KEY])
+if not _llm_keys_present:
+    _missing_vars.append("GROQ_API_KEY or OPENROUTER_API_KEY or TOGETHER_API_KEY or FIREWORKS_API_KEY")
+
 if _missing_vars:
     raise EnvironmentError(f"Missing required environment variables: {', '.join(_missing_vars)}")
 
@@ -965,6 +975,54 @@ GROQ_MODEL_CHAIN = [
 
 
 # ============================================================
+# MULTI-PROVIDER LLM FAILOVER (Groq + OpenRouter + Together + Fireworks)
+# ============================================================
+# Each provider uses an OpenAI-compatible Chat Completions endpoint.
+# We enforce per-provider cooldowns on HTTP 429 to avoid burning limits.
+#
+# Env vars (set any/all):
+# - GROQ_API_KEY
+# - OPENROUTER_API_KEY
+# - TOGETHER_API_KEY
+# - FIREWORKS_API_KEY
+#
+# Optional model overrides:
+# - GROQ_MODEL_PRIMARY (default: first of GROQ_MODEL_CHAIN)
+# - OPENROUTER_MODEL   (default: meta-llama/llama-3.1-8b-instruct)
+# - TOGETHER_MODEL     (default: meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo)
+# - FIREWORKS_MODEL    (default: accounts/fireworks/models/llama-v3p1-8b-instruct)
+#
+# Optional:
+# - GROQ_COOLDOWN_SECONDS (already supported)
+# - LLM_PROVIDER_COOLDOWN_SECONDS (default 600) for non-Groq providers
+# - OPENROUTER_BASE_URL / TOGETHER_BASE_URL / FIREWORKS_BASE_URL (advanced)
+
+LLM_PROVIDER_COOLDOWN_SECONDS = int(os.environ.get("LLM_PROVIDER_COOLDOWN_SECONDS", "600"))
+
+OPENROUTER_BASE_URL = os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").rstrip("/")
+TOGETHER_BASE_URL = os.environ.get("TOGETHER_BASE_URL", "https://api.together.xyz/v1").rstrip("/")
+FIREWORKS_BASE_URL = os.environ.get("FIREWORKS_BASE_URL", "https://api.fireworks.ai/inference/v1").rstrip("/")
+GROQ_BASE_URL = os.environ.get("GROQ_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/")
+
+GROQ_MODEL_PRIMARY = os.environ.get("GROQ_MODEL_PRIMARY", GROQ_MODEL_CHAIN[0])
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "meta-llama/llama-3.1-8b-instruct")
+TOGETHER_MODEL = os.environ.get("TOGETHER_MODEL", "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo")
+FIREWORKS_MODEL = os.environ.get("FIREWORKS_MODEL", "accounts/fireworks/models/llama-v3p1-8b-instruct")
+
+LLM_PROVIDERS = [
+    {"name": "groq", "base_url": GROQ_BASE_URL, "key": lambda: GROQ_KEY, "model": lambda: GROQ_MODEL_PRIMARY, "cooldown": lambda: GROQ_COOLDOWN_SECONDS},
+    {"name": "openrouter", "base_url": OPENROUTER_BASE_URL, "key": lambda: OPENROUTER_KEY, "model": lambda: OPENROUTER_MODEL, "cooldown": lambda: LLM_PROVIDER_COOLDOWN_SECONDS},
+    {"name": "together", "base_url": TOGETHER_BASE_URL, "key": lambda: TOGETHER_KEY, "model": lambda: TOGETHER_MODEL, "cooldown": lambda: LLM_PROVIDER_COOLDOWN_SECONDS},
+    {"name": "fireworks", "base_url": FIREWORKS_BASE_URL, "key": lambda: FIREWORKS_KEY, "model": lambda: FIREWORKS_MODEL, "cooldown": lambda: LLM_PROVIDER_COOLDOWN_SECONDS},
+]
+
+_provider_disabled_until = {p["name"]: 0.0 for p in LLM_PROVIDERS}
+_provider_index = 0  # rotates start provider across cycles
+_last_provider_used = None
+
+
+
+# ============================================================
 # GROQ RATE LIMIT PROTECTION STATE
 # ============================================================
 # If Groq returns 429, we pause LLM calls for a short cooldown window
@@ -978,25 +1036,117 @@ _groq_model_index: int = 0
 
 
 
-def call_groq(system: str, prompt: str, temperature: float = 0.8,
-              timeout: int = GROQ_TIMEOUT_STAGE1,
-              max_tokens: int = GROQ_MAX_TOKENS_STAGE2) -> Optional[str]:
-    """Call Groq API with strong rate-limit protection.
 
-    Behavior:
-    - Try ONE model per cycle.
-    - On HTTP 429, enter cooldown (default 5 minutes) and rotate to next model for NEXT cycle.
+def _openai_compat_headers(provider_name: str, api_key: str) -> dict:
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    # OpenRouter recommends sending these; optional but harmless if unset.
+    if provider_name == "openrouter":
+        ref = os.environ.get("OPENROUTER_HTTP_REFERER")
+        title = os.environ.get("OPENROUTER_APP_TITLE")
+        if ref:
+            headers["HTTP-Referer"] = ref
+        if title:
+            headers["X-Title"] = title
+    return headers
+
+
+def call_llm(system: str, prompt: str, temperature: float = 0.8,
+             timeout: int = GROQ_TIMEOUT_STAGE1, max_tokens: int = GROQ_MAX_TOKENS_STAGE2) -> Optional[str]:
     """
-
-    global _last_groq_error, _groq_disabled_until, _last_successful_model, _groq_model_index
+    Multi-provider LLM call with per-provider cooldowns.
+    Tries at most ONE provider per cycle (plus rotates provider preference each cycle).
+    """
+    global _last_groq_error, _provider_index, _last_provider_used
 
     now = time.time()
+    prompt_len = len(system) + len(prompt)
+    log.info(f"LLM call: prompt_len={prompt_len}, max_tokens={max_tokens}, timeout={timeout}s")
 
-    # Cooldown check
-    if now < _groq_disabled_until:
-        remaining = int(_groq_disabled_until - now)
-        _last_groq_error = f"Groq cooldown active ({remaining}s remaining)"
-        log.warning(f"Groq in cooldown â skipping LLM this cycle ({remaining}s left).")
+    # Build list of providers that have a key set
+    available = []
+    for p in LLM_PROVIDERS:
+        key = p["key"]()
+        if key:
+            available.append(p)
+
+    if not available:
+        _last_groq_error = "No LLM provider keys configured"
+        log.error(_last_groq_error)
+        return None
+
+    # Rotate which provider we try first across cycles
+    start = _provider_index % len(available)
+    provider = available[start]
+
+    # If chosen provider is cooling down, look for next available not cooling down (one pass)
+    for _ in range(len(available)):
+        name = provider["name"]
+        if now >= _provider_disabled_until.get(name, 0.0):
+            break
+        start = (start + 1) % len(available)
+        provider = available[start]
+    else:
+        # Everyone is cooling down
+        soonest = min(_provider_disabled_until.get(p["name"], now + 9999) for p in available)
+        remaining = int(max(0, soonest - now))
+        _last_groq_error = f"All providers cooling down ({remaining}s until next)"
+        log.warning(_last_groq_error)
+        return None
+
+    provider_name = provider["name"]
+    base_url = provider["base_url"]
+    api_key = provider["key"]()
+    model = provider["model"]()
+    cooldown = provider["cooldown"]()
+
+    try:
+        log.info(f"Trying provider={provider_name} model={model}")
+        resp = requests.post(
+            f"{base_url}/chat/completions",
+            headers=_openai_compat_headers(provider_name, api_key),
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            },
+            timeout=timeout,
+        )
+
+        if resp.status_code == 429:
+            _provider_disabled_until[provider_name] = now + cooldown
+            _provider_index = (_provider_index + 1) % len(available)  # rotate for next cycle
+            _last_groq_error = f"{provider_name}:{model} rate limited (cooldown {cooldown}s)"
+            log.warning(_last_groq_error)
+            return None
+
+        if resp.status_code != 200:
+            _last_groq_error = f"{provider_name}:{model} HTTP {resp.status_code}: {resp.text[:200]}"
+            log.error(f"LLM API error: {_last_groq_error}")
+            # Rotate provider next cycle if this provider is unhealthy
+            _provider_index = (_provider_index + 1) % len(available)
+            return None
+
+        data = resp.json()
+        content = data["choices"][0]["message"]["content"]
+        _last_provider_used = provider_name
+        return content
+
+    except requests.exceptions.Timeout:
+        _last_groq_error = f"{provider_name}:{model} Timeout after {timeout}s"
+        log.error(_last_groq_error)
+        _provider_index = (_provider_index + 1) % len(available)
+        return None
+    except Exception as e:
+        _last_groq_error = f"{provider_name}:{model} Exception: {str(e)[:200]}"
+        log.error(_last_groq_error)
+        _provider_index = (_provider_index + 1) % len(available)
         return None
 
     prompt_len = len(system) + len(prompt)
@@ -1368,7 +1518,7 @@ Total rules should be 5-10. Each must be specific, actionable, and data-backed."
 
     user_prompt = f"EXISTING RULES:\n{existing_text}\n\nTRADE DATA:\n{summary}"
 
-    result = call_groq(system, user_prompt, temperature=0.3, timeout=GROQ_TIMEOUT_RULES)
+    result = call_llm(system, user_prompt, temperature=0.3, timeout=GROQ_TIMEOUT_RULES)
     if not result:
         return
 
@@ -2410,7 +2560,7 @@ def handle_user_messages(pb: dict) -> None:
             f"{context}"
         )
 
-        reply = call_groq(system, sanitized_text, temperature=0.6, timeout=30)
+        reply = call_llm(system, sanitized_text, temperature=0.6, timeout=30)
         if reply:
             send_msg(f"\U0001f4ac {reply[:TELEGRAM_MSG_LIMIT]}")
             replies_sent += 1
@@ -2524,7 +2674,7 @@ def main() -> None:
 
     # ---- STEP 3: Stage 1 - Quick scan ----
     scan_prompt = build_scan_prompt(playbook)
-    stage1_result = call_groq(
+    stage1_result = call_llm(
         scan_prompt, f"Analyze:\n\n{token_data}",
         temperature=0.5, timeout=GROQ_TIMEOUT_STAGE1, max_tokens=GROQ_MAX_TOKENS_STAGE1,
     )
@@ -2574,7 +2724,7 @@ def main() -> None:
         f"Do DEEP RESEARCH on each pick. Reference your real track record and strategy rules."
     )
 
-    research = call_groq(
+    research = call_llm(
         research_prompt, deep_prompt,
         temperature=0.85, timeout=GROQ_TIMEOUT_STAGE2, max_tokens=GROQ_MAX_TOKENS_STAGE2,
     )
