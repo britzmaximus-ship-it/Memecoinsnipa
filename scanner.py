@@ -977,11 +977,15 @@ _groq_model_index: int = 0
 
 
 
+
 def call_groq(system: str, prompt: str, temperature: float = 0.8,
               timeout: int = GROQ_TIMEOUT_STAGE1,
               max_tokens: int = GROQ_MAX_TOKENS_STAGE2) -> Optional[str]:
-    """
-    Call Groq API with strong rate-limit protection.
+    """Call Groq API with strong rate-limit protection.
+
+    Behavior:
+    - Try ONE model per cycle.
+    - On HTTP 429, enter cooldown (default 5 minutes) and rotate to next model for NEXT cycle.
     """
 
     global _last_groq_error, _groq_disabled_until, _last_successful_model, _groq_model_index
@@ -998,6 +1002,7 @@ def call_groq(system: str, prompt: str, temperature: float = 0.8,
     prompt_len = len(system) + len(prompt)
     log.info(f"Groq call: prompt_len={prompt_len}, max_tokens={max_tokens}, timeout={timeout}s")
 
+    # Choose model
     if _last_successful_model and _last_successful_model in GROQ_MODEL_CHAIN:
         model_to_try = _last_successful_model
     else:
@@ -1024,11 +1029,12 @@ def call_groq(system: str, prompt: str, temperature: float = 0.8,
             timeout=timeout,
         )
 
+        # Rate limited -> cooldown and rotate model next cycle
         if resp.status_code == 429:
             _groq_model_index = (_groq_model_index + 1) % len(GROQ_MODEL_CHAIN)
             _groq_disabled_until = now + GROQ_COOLDOWN_SECONDS
             _last_groq_error = f"{model_to_try}: rate limited"
-            log.warning(f"Groq rate limited. Cooldown {GROQ_COOLDOWN_SECONDS}s.")
+            log.warning(f"Groq rate limited on {model_to_try}. Cooldown {GROQ_COOLDOWN_SECONDS}s. Next model next cycle.")
             return None
 
         if resp.status_code != 200:
@@ -1043,102 +1049,17 @@ def call_groq(system: str, prompt: str, temperature: float = 0.8,
         return content
 
     except requests.exceptions.Timeout:
-        _last_groq_error = f"{model_to_try}: Timeout"
-        log.error("Groq timeout")
-        return None
-
-    except Exception as e:
-        _last_groq_error = f"{model_to_try}: {str(e)}"
-        log.error(f"Groq exception: {_last_groq_error}")
-        return None
-
-
-    prompt_len = len(system) + len(prompt)
-    log.info(f"Groq call: prompt_len={prompt_len}, max_tokens={max_tokens}, timeout={timeout}s")
-
-    # Prefer last successful model; otherwise use rotating index
-    if _last_successful_model and _last_successful_model in GROQ_MODEL_CHAIN:
-        model_to_try = _last_successful_model
-    else:
-        model_to_try = GROQ_MODEL_CHAIN[_groq_model_index % len(GROQ_MODEL_CHAIN)]
-
-    try:
-        log.info(f"Trying model: {model_to_try}")
-        resp = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {GROQ_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": model_to_try,
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": prompt},
-                ],
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-            },
-            timeout=timeout,
-        )
-
-        # ð¥ Rate limited: enter cooldown + rotate model for NEXT cycle
-        if resp.status_code == 429:
-            _groq_model_index = (_groq_model_index + 1) % len(GROQ_MODEL_CHAIN)
-            _groq_disabled_until = now + GROQ_COOLDOWN_SECONDS
-            _last_groq_error = f"{model_to_try}: rate limited (cooldown {GROQ_COOLDOWN_SECONDS}s)"
-            log.warning(f"Groq rate limited on {model_to_try}. Cooldown {GROQ_COOLDOWN_SECONDS}s. Next model on next cycle.")
-            return None
-
-        # Other HTTP errors: surface and stop (no cascade retry)
-        if resp.status_code != 200:
-            _last_groq_error = f"{model_to_try} HTTP {resp.status_code}: {resp.text[:200]}"
-            log.error(f"Groq API error: {_last_groq_error}")
-            return None
-
-        result = resp.json()
-        content = result["choices"][0]["message"]["content"]
-
-        # Mark success model
-        _last_successful_model = model_to_try
-        return content
-
-    except requests.exceptions.Timeout:
-        _last_groq_error = f"{model_to_try}: Timeout after {timeout}s (prompt_len={prompt_len})"
-        log.error(f"Groq API: {_last_groq_error}")
+        _last_groq_error = f"{model_to_try}: Timeout after {timeout}s"
+        log.error(f"Groq timeout: {_last_groq_error}")
         return None
     except requests.exceptions.RequestException as e:
         _last_groq_error = f"{model_to_try}: Request failed: {str(e)[:200]}"
-        log.error(f"Groq API: {_last_groq_error}")
+        log.error(f"Groq request error: {_last_groq_error}")
         return None
     except (KeyError, IndexError) as e:
         _last_groq_error = f"{model_to_try}: Bad response format: {str(e)[:200]}"
-        log.error(f"Groq API: {_last_groq_error}")
+        log.error(f"Groq bad response: {_last_groq_error}")
         return None
-
-            result = resp.json()
-            content = result["choices"][0]["message"]["content"]
-            if model != GROQ_MODEL_CHAIN[0]:
-                log.info(f"Fallback model {model} succeeded")
-            return content
-
-        except requests.exceptions.Timeout:
-            _last_groq_error = f"{model}: Timeout after {timeout}s (prompt_len={prompt_len})"
-            log.error(f"Groq API: {_last_groq_error}")
-            return None
-        except requests.exceptions.RequestException as e:
-            _last_groq_error = f"{model}: Request failed: {str(e)[:200]}"
-            log.error(f"Groq API: {_last_groq_error}")
-            return None
-        except (KeyError, IndexError) as e:
-            _last_groq_error = f"{model}: Bad response format: {str(e)[:200]}"
-            log.error(f"Groq API: {_last_groq_error}")
-            return None
-
-    # All models rate limited
-    _last_groq_error = f"All models rate limited: {', '.join(errors)}"
-    log.error(f"Groq API: {_last_groq_error}")
-    return None
 
 
 # ============================================================
