@@ -304,3 +304,29 @@ class JupiterTrader:
 
     def sell_pct(self, mint: str, pct: float) -> Dict[str, Any]:
         return sell_token_pct(mint, pct)
+        class JupiterTrader:
+    """
+    Backwards-compatible class wrapper.
+    Your scanner can do: from trader import JupiterTrader
+    """
+
+    def __init__(self):
+        pass
+
+    def is_enabled(self) -> bool:
+        return is_live_trading_enabled()
+
+    def wallet(self) -> Dict[str, Any]:
+        return get_wallet_summary()
+
+    def buy(self, mint_address: str, sol_amount: float) -> Dict[str, Any]:
+        return buy_token(mint_address, sol_amount)
+
+    def sell(self, mint_address: str) -> Dict[str, Any]:
+        return sell_token(mint_address)
+
+    def sell_pct(self, mint_address: str, pct: float) -> Dict[str, Any]:
+        return sell_token_pct(mint_address, pct)
+
+    def sell_amount_raw(self, mint_address: str, raw_amount: int) -> Dict[str, Any]:
+        return sell_token_amount_raw(mint_address, raw_amount)
