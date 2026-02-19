@@ -4,14 +4,10 @@ scanner.py
 
 Main loop:
 - Discover new pairs via DexScreener
-- Filter / score via rules (+ optional LLM text analysis if you want later)
+- Filter / score via rules (+ optional LLM later)
 - Open paper trades + monitor paper trades
 - Optional: performance-gated mirroring to LIVE trades
 - Send Telegram updates each scan
-
-NOTE:
-- Railway run.py imports: `from scanner import run_forever`
-  so this file MUST provide run_forever().
 """
 
 import time
@@ -21,13 +17,11 @@ import os
 import json
 import math
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional, Tuple
 
 import requests
 
 from telegram_client import TelegramClient
 from storage import Storage
-from llm import LLM  # <-- FIX: your llm.py defines LLM, not LLMScorer
 from trader import JupiterTrader
 
 log = logging.getLogger("scanner")
@@ -54,11 +48,11 @@ MIN_SCORE = float(os.getenv("MIN_SCORE", "0.12"))
 
 LIVE_TRADING_ENABLED = os.getenv("LIVE_TRADING_ENABLED", "false").lower() == "true"
 
-PLAYBOOK_PATH = os.getenv("PLAYBOOK_PATH", "playbook.json")
-
 # ============================================================
 # PLAYBOOK STATS (for Telegram scan messages)
 # ============================================================
+
+PLAYBOOK_PATH = os.getenv("PLAYBOOK_PATH", "playbook.json")
 
 
 def _load_playbook_json(path: str = PLAYBOOK_PATH) -> dict:
@@ -73,37 +67,23 @@ def _load_playbook_json(path: str = PLAYBOOK_PATH) -> dict:
 
 
 def _compute_paper_trade_stats(playbook: dict) -> dict:
-    """
-    Compute open/closed counts, win-rate, and average return% from playbook.
-    This is defensive because playbook schemas vary.
-    """
+    """Compute open/closed counts, win-rate, and average return% from playbook."""
     open_trades = playbook.get("paper_trades") or playbook.get("paperTrades") or []
     history = playbook.get("paper_trade_history") or playbook.get("paperTradeHistory") or []
 
-    # Fallback: some builds store everything under 'trades'
     if not history and isinstance(playbook.get("trades"), list):
-        maybe = [
-            t for t in playbook.get("trades", [])
-            if isinstance(t, dict) and str(t.get("mode", "")).upper() == "PAPER"
-        ]
+        maybe = [t for t in playbook.get("trades", []) if str(t.get("mode", "")).upper() == "PAPER"]
         history = maybe or playbook.get("trades", [])
 
     closed = [t for t in history if isinstance(t, dict)]
-
     wins = 0
-    returns: List[float] = []
+    returns = []
 
     for t in closed:
-        # win detection
-        # supports: result="WIN", win=True, outcome="TP", etc.
-        if t.get("win") is True:
+        result = str(t.get("result", t.get("outcome", ""))).upper()
+        if result.startswith("WIN") or result in {"TP", "PROFIT"}:
             wins += 1
-        else:
-            result = str(t.get("result", t.get("outcome", ""))).upper()
-            if result.startswith("WIN") or result in {"TP", "PROFIT"}:
-                wins += 1
 
-        # return% extraction
         rp = t.get("return_pct", t.get("returnPercent", None))
         if isinstance(rp, (int, float)) and math.isfinite(rp):
             returns.append(float(rp))
@@ -128,7 +108,6 @@ def _compute_paper_trade_stats(playbook: dict) -> dict:
 
 
 def _format_pick_tracker_block(stats: dict) -> str:
-    """Return a stats block for Telegram (or empty string if not enough data)."""
     if not stats:
         return ""
 
@@ -143,11 +122,8 @@ def _format_pick_tracker_block(stats: dict) -> str:
     lines.append("📋 PICK TRACKER UPDATE")
     lines.append("===================================")
     lines.append(f"Active: {open_} | Pending: {pending} | Closed: {closed}")
-    if closed and win_rate is not None:
-        if avg_return is not None:
-            lines.append(f"Win rate: {win_rate:.1f}% | Avg return: {avg_return:+.1f}%")
-        else:
-            lines.append(f"Win rate: {win_rate:.1f}%")
+    if win_rate is not None and avg_return is not None and closed:
+        lines.append(f"Win rate: {win_rate:.1f}% | Avg return: {avg_return:+.1f}%")
     return "\n".join(lines)
 
 
@@ -155,19 +131,27 @@ def _format_pick_tracker_block(stats: dict) -> str:
 # HELPERS
 # ============================================================
 
-def now_utc() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-def safe_float(x, default=0.0) -> float:
+def safe_float(x, default=0.0):
     try:
         return float(x)
     except Exception:
         return default
 
+
 def minutes_since(ts_ms: int) -> float:
     return (time.time() * 1000 - ts_ms) / 60000.0
 
-def fetch_pairs(query: str) -> List[dict]:
+
+def compute_accel(pair: dict) -> float:
+    pc = safe_float(pair.get("priceChange", {}).get("h1", 0.0), 0.0)
+    vol = safe_float(pair.get("volume", {}).get("h1", 0.0), 0.0)
+    liq = safe_float((pair.get("liquidity") or {}).get("usd", 0.0), 0.0)
+    if liq <= 0:
+        return 0.0
+    return (abs(pc) / 100.0) + (vol / max(liq, 1.0))
+
+
+def fetch_pairs(query: str):
     url = f"{DEXSCREENER_SEARCH_URL}?q={query}"
     r = requests.get(url, timeout=20)
     r.raise_for_status()
@@ -175,16 +159,22 @@ def fetch_pairs(query: str) -> List[dict]:
     pairs = data.get("pairs", []) or []
     return [p for p in pairs if p.get("chainId") == SOLANA_CHAIN_ID]
 
-def is_pair_age_ok(pair: dict) -> Tuple[bool, Optional[float]]:
+
+def is_pair_age_ok(pair: dict) -> bool:
     created = pair.get("pairCreatedAt")
     if not created:
-        return False, None
-    age_min = minutes_since(int(created))
-    return (AGE_MIN_MINUTES <= age_min <= AGE_MAX_MINUTES), age_min
+        return False
+    try:
+        age_min = minutes_since(int(created))
+    except Exception:
+        return False
+    return AGE_MIN_MINUTES <= age_min <= AGE_MAX_MINUTES
+
 
 def is_pair_liquidity_ok(pair: dict) -> bool:
     liq = safe_float((pair.get("liquidity") or {}).get("usd", 0.0), 0.0)
     return liq >= MIN_LIQUIDITY_USD
+
 
 def is_pair_mc_ok(pair: dict) -> bool:
     fdv = safe_float(pair.get("fdv", 0.0), 0.0)
@@ -192,63 +182,40 @@ def is_pair_mc_ok(pair: dict) -> bool:
         return True
     return fdv <= MAX_MC_USD
 
-def compute_accel(pair: dict) -> float:
-    # same heuristic as before
-    pc = safe_float((pair.get("priceChange") or {}).get("h1", 0.0), 0.0)
-    vol = safe_float((pair.get("volume") or {}).get("h1", 0.0), 0.0)
-    liq = safe_float((pair.get("liquidity") or {}).get("usd", 0.0), 0.0)
-    if liq <= 0:
-        return 0.0
-    return (abs(pc) / 100.0) + (vol / max(liq, 1.0))
-
-def accel_to_score(accel: float) -> float:
-    """
-    Convert accel into a 0..1-ish score so MIN_SCORE=0.12 makes sense.
-    accel=1.0 -> 0.50
-    accel=0.9 -> 0.47
-    accel=2.0 -> 0.67
-    """
-    if accel <= 0:
-        return 0.0
-    return accel / (1.0 + accel)
 
 def get_pair_symbol(pair: dict) -> str:
     base = (pair.get("baseToken") or {}).get("symbol") or "UNK"
     return str(base).strip()
 
+
 def get_pair_mint(pair: dict) -> str:
     base = (pair.get("baseToken") or {}).get("address") or ""
     return str(base).strip()
 
+
 # ============================================================
-# LOOP
+# MAIN
 # ============================================================
 
-def run_forever():
+def main():
     tg = TelegramClient()
     store = Storage()
-    llm = LLM()  # currently optional; not required to score numerically
     trader = JupiterTrader()
 
     while True:
         try:
             scan_start = time.time()
-
             store.state["scans"] = int(store.state.get("scans", 0)) + 1
             scan_id = store.state["scans"]
 
-            # 1) Discover
+            # Pull candidates
             pairs = fetch_pairs("pump")
-            discovered = len(pairs)
-
             random.shuffle(pairs)
             pairs = pairs[: MAX_NEW_PER_SCAN * 3]
 
-            # 2) Filter
-            filtered_candidates: List[Tuple[dict, float, float]] = []  # (pair, accel, age_min)
+            candidates = []
             for p in pairs:
-                ok_age, age_min = is_pair_age_ok(p)
-                if not ok_age:
+                if not is_pair_age_ok(p):
                     continue
                 if not is_pair_liquidity_ok(p):
                     continue
@@ -259,79 +226,71 @@ def run_forever():
                 if accel < MIN_ACCEL:
                     continue
 
-                filtered_candidates.append((p, accel, age_min if age_min is not None else 0.0))
+                candidates.append((p, accel))
 
-            filtered = len(filtered_candidates)
-
-            # 3) Score (numeric scoring so bot can keep running)
+            # Score candidates (stable fallback: use accel as score)
             scored = []
-            for p, accel, age_min in filtered_candidates[:MAX_NEW_PER_SCAN]:
+            for p, accel in candidates[:MAX_NEW_PER_SCAN]:
                 symbol = get_pair_symbol(p)
                 mint = get_pair_mint(p)
                 fdv = safe_float(p.get("fdv", 0.0), 0.0)
                 liq = safe_float((p.get("liquidity") or {}).get("usd", 0.0), 0.0)
 
-                score = accel_to_score(accel)
+                score = accel  # ✅ stable fallback (no LLM dependency)
+
                 if score < MIN_SCORE:
                     continue
 
-                scored.append({
-                    "symbol": symbol,
-                    "mint": mint,
-                    "score": score,
-                    "accel": accel,
-                    "liq": liq,
-                    "fdv": fdv,
-                    "age_min": age_min,
-                    "url": p.get("url", ""),
-                    "pair": p,
-                })
+                scored.append(
+                    {
+                        "symbol": symbol,
+                        "mint": mint,
+                        "score": score,
+                        "accel": accel,
+                        "liq": liq,
+                        "fdv": fdv,
+                        "url": p.get("url", ""),
+                        "pair": p,
+                    }
+                )
 
             scored.sort(key=lambda x: x["score"], reverse=True)
-            ranked = len(scored)
 
-            # 4) Monitor paper trades (your Storage handles logic)
+            # Monitor paper trades
             store.monitor_paper_trades()
 
-            # 5) Auto-open paper trades for top candidates
+            # Auto-open paper trades for top scored candidates
             opened_msgs = []
             for item in scored[:5]:
                 msg = store.try_open_paper_trade(item)
                 if msg:
                     opened_msgs.append(msg)
 
-            # 6) Live gate
-            live_gate_ok = False
-            gate_msg = ""
-            if LIVE_TRADING_ENABLED:
-                live_gate_ok = bool(store.evaluate_live_gate())
-                gate_msg = "LIVE gate: ✅ enabled (performance-gated)" if live_gate_ok else "LIVE gate: ❌ disabled (needs better paper performance)"
+            # Optional live gate + mirroring
+            live_msgs = []
+            if LIVE_TRADING_ENABLED and store.evaluate_live_gate():
+                live_msgs.append("LIVE gate: ✅ enabled (performance-gated)")
             else:
-                gate_msg = "LIVE gate: ❌ disabled (LIVE_TRADING_ENABLED=false)"
+                live_msgs.append("LIVE gate: ❌ disabled (needs better paper performance)")
 
-            # 7) Stats from playbook.json
+            # Build Telegram message
+            top_lines = []
+            for i, x in enumerate(scored[:10], 1):
+                top_lines.append(
+                    f"{i:02d}. {x['symbol']} | score={x['score']:.3f} | accel={x['accel']:.3f} | liq=${x['liq']:.0f} | fdv=${x['fdv']:.0f}"
+                )
+
             playbook_stats = _compute_paper_trade_stats(_load_playbook_json())
             pick_tracker_block = _format_pick_tracker_block(playbook_stats)
 
-            # 8) Build Telegram message
-            top_lines = []
-            for x in scored[:10]:
-                top_lines.append(
-                    f"{x['symbol']} score={x['score']:.3f} age={int(x['age_min'])}m liq=${x['liq']:.0f} accel={x['accel']:.2f}"
-                )
-
             lines = [
                 f"Scan #{scan_id}",
-                f"Paper: open={playbook_stats.get('open', 0)} closed={playbook_stats.get('closed', 0)}",
-                f"Wallet: {store.get_wallet_balance_sol():.6f} SOL live_env={LIVE_TRADING_ENABLED} mirror={getattr(store, 'mirror_enabled', True)}",
-                f"Quality: MIN_ACCEL={MIN_ACCEL} MIN_SCORE={MIN_SCORE} age={AGE_MIN_MINUTES}-{AGE_MAX_MINUTES}m",
-                f"Candidates: discovered={discovered} filtered={filtered} ranked={ranked}",
+                f"Candidates: {len(candidates)} | Scored: {len(scored)} | Filters: age {AGE_MIN_MINUTES}-{AGE_MAX_MINUTES}m, liq>={MIN_LIQUIDITY_USD}, mc<={MAX_MC_USD}, accel>={MIN_ACCEL}, score>={MIN_SCORE}",
+                f"Paper: open={playbook_stats.get('open', len(store.get_open_paper_trades()))} closed={playbook_stats.get('closed', (store.state.get('stats') or {}).get('paper', {}).get('closed', 0))}",
+                "",
+                "Top picks:",
+                *(top_lines if top_lines else ["(none)"]),  # ✅ FIXED: valid star-unpack
             ]
-
-            if top_lines:
-                lines.append("")
-                lines.append("Top:")
-                lines.extend(top_lines[:3])
 
             if pick_tracker_block:
                 lines.append("")
@@ -339,19 +298,27 @@ def run_forever():
 
             if opened_msgs:
                 lines.append("")
-                lines.append("Updates:")
-                for m in opened_msgs:
-                    lines.append(f"- {m}")
+                lines.append("Opened paper trades:")
+                lines.extend([f"- {m}" for m in opened_msgs])
 
-            lines.append("")
-            lines.append(gate_msg)
+            if live_msgs:
+                lines.append("")
+                lines.append("Live trading:")
+                lines.extend([f"- {m}" for m in live_msgs])
 
-            tg.send("\n".join(lines))
+            msg = "\n".join(lines)
+
+            # Telegram send should never crash the loop
+            try:
+                tg.send(msg)
+            except Exception as te:
+                log.warning("Telegram send failed: %s", te)
 
             store.save()
 
             elapsed = time.time() - scan_start
-            time.sleep(max(0, SCAN_INTERVAL_SECONDS - elapsed))
+            sleep_for = max(0, SCAN_INTERVAL_SECONDS - elapsed)
+            time.sleep(sleep_for)
 
         except Exception as e:
             log.exception("Scan loop error: %s", e)
@@ -363,4 +330,4 @@ def run_forever():
 
 
 if __name__ == "__main__":
-    run_forever()
+    main()
