@@ -1,12 +1,33 @@
 import time
 import logging
-import requests
 import re
 from typing import Optional, Dict, Any
 
-from utils import env_str, env_int
+try:
+    import requests
+except Exception as e:
+    # If requests isn't installed, we don't want the whole bot to crash.
+    requests = None
 
 log = logging.getLogger("memecoinsnipa.llm")
+
+
+# ============================================================
+# ENV HELPERS (safe fallback if utils.py is missing)
+# ============================================================
+
+def env_str(key: str, default: str = "") -> str:
+    import os
+    v = os.getenv(key)
+    return v.strip() if isinstance(v, str) and v.strip() else default
+
+def env_int(key: str, default: int = 0) -> int:
+    import os
+    v = os.getenv(key)
+    try:
+        return int(v) if v is not None else default
+    except Exception:
+        return default
 
 
 # ============================================================
@@ -17,7 +38,7 @@ class LLM:
     """
     Groq-first with cooldown protection.
     Optional OpenRouter fallback.
-    Never raises — always returns None on failure.
+    Never raises — returns None on failure.
     """
 
     def __init__(self):
@@ -33,8 +54,6 @@ class LLM:
         self.last_call = 0
         self.cooldown_until = 0
 
-    # --------------------------------------------------------
-
     def _can_call(self) -> bool:
         now = time.time()
         if now < self.cooldown_until:
@@ -43,22 +62,16 @@ class LLM:
             return False
         return True
 
-    # --------------------------------------------------------
-
     def _call_groq(self, prompt: str) -> Optional[str]:
-        if not self.groq_key:
+        if not self.groq_key or requests is None:
             return None
 
         url = "https://api.groq.com/openai/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {self.groq_key}",
-            "Content-Type": "application/json",
-        }
-
+        headers = {"Authorization": f"Bearer {self.groq_key}", "Content-Type": "application/json"}
         payload = {
             "model": self.groq_model,
             "messages": [
-                {"role": "system", "content": "You are a memecoin trading analyst. Respond with a numeric score between 0 and 1 only."},
+                {"role": "system", "content": "Return ONLY a numeric score between 0 and 1."},
                 {"role": "user", "content": prompt},
             ],
             "temperature": 0.3,
@@ -77,28 +90,22 @@ class LLM:
                 log.warning(f"Groq failed {r.status_code}: {r.text[:200]}")
                 return None
 
-            return r.json()["choices"][0]["message"]["content"]
+            return r.json().get("choices", [{}])[0].get("message", {}).get("content")
 
         except Exception as e:
             log.warning(f"Groq exception: {e}")
             return None
 
-    # --------------------------------------------------------
-
     def _call_openrouter(self, prompt: str) -> Optional[str]:
-        if not self.openrouter_key:
+        if not self.openrouter_key or requests is None:
             return None
 
         url = "https://openrouter.ai/api/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {self.openrouter_key}",
-            "Content-Type": "application/json",
-        }
-
+        headers = {"Authorization": f"Bearer {self.openrouter_key}", "Content-Type": "application/json"}
         payload = {
             "model": self.openrouter_model,
             "messages": [
-                {"role": "system", "content": "You are a memecoin trading analyst. Respond with a numeric score between 0 and 1 only."},
+                {"role": "system", "content": "Return ONLY a numeric score between 0 and 1."},
                 {"role": "user", "content": prompt},
             ],
             "temperature": 0.3,
@@ -116,45 +123,41 @@ class LLM:
                 log.warning(f"OpenRouter failed {r.status_code}: {r.text[:200]}")
                 return None
 
-            return r.json()["choices"][0]["message"]["content"]
+            return r.json().get("choices", [{}])[0].get("message", {}).get("content")
 
         except Exception as e:
             log.warning(f"OpenRouter exception: {e}")
             return None
 
-    # --------------------------------------------------------
-
     def analyze(self, payload: Dict[str, Any]) -> Optional[str]:
         if not self._can_call():
             return None
 
-        prompt = f"Token data:\n{payload}\n\nReturn only a score between 0 and 1."
+        prompt = f"Token payload:\n{payload}\n\nReturn only a score between 0 and 1."
 
-        # Try Groq
-        result = self._call_groq(prompt)
-        if result:
+        out = self._call_groq(prompt)
+        if out:
             self.last_call = time.time()
-            return result
+            return out
 
-        # Fallback
-        result = self._call_openrouter(prompt)
-        if result:
+        out = self._call_openrouter(prompt)
+        if out:
             self.last_call = time.time()
-            return result
+            return out
 
         return None
 
 
 # ============================================================
-# COMPATIBILITY SCORER (Scanner expects this)
+# SCANNER-COMPAT WRAPPER
 # ============================================================
 
 class LLMScorer:
     """
-    Wrapper so scanner.py can call:
-        score = llm.score_token(...)
-    Always returns float.
-    Never crashes.
+    scanner.py expects:
+      from llm import LLMScorer
+      score = llm.score_token(...)
+    Always returns float. Never crashes.
     """
 
     def __init__(self):
@@ -169,9 +172,9 @@ class LLMScorer:
         accel: float,
         pair: dict,
     ) -> float:
-
         payload = {
             "symbol": symbol,
+            "mint": mint,
             "liquidity_usd": liquidity_usd,
             "fdv_usd": fdv_usd,
             "accel": accel,
@@ -179,18 +182,16 @@ class LLMScorer:
 
         try:
             text = self.llm.analyze(payload)
-
             if not text:
                 return 0.0
 
-            # Extract first numeric value from response
-            nums = re.findall(r"(\d+(?:\.\d+)?)", text)
+            nums = re.findall(r"(\d+(?:\.\d+)?)", str(text))
             if not nums:
                 return 0.0
 
             val = float(nums[0])
 
-            # Normalize common formats
+            # normalize common formats
             if val > 10:
                 val = val / 100.0
             elif val > 1.5:
