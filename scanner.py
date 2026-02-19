@@ -1,320 +1,352 @@
+#!/usr/bin/env python3
+"""
+scanner.py
+
+Main loop:
+- Discover new pairs via DexScreener
+- Filter / score via rules + LLM
+- Open paper trades + monitor paper trades
+- Optional: performance-gated mirroring to LIVE trades
+- Send Telegram updates each scan
+"""
+
 import time
+import random
 import logging
-from typing import Dict, Any, List, Optional
+import os
+import json
+import math
+from datetime import datetime, timezone
 
-from utils import setup_logging, env_int, env_float, env_str, env_bool, jitter_sleep
+import requests
+
 from telegram_client import TelegramClient
-from datasource import DexScreenerClient
-from storage import Storage, make_feature_buckets
-from discovery import discover_solana_candidates
-
-from trader import (
-    buy_token,
-    sell_token,
-    sell_token_pct,
-    get_wallet_summary,
-    is_live_trading_enabled,
-)
-
-log = logging.getLogger("memecoinsnipa.scanner")
-
-SCAN_INTERVAL_SECONDS = env_int("SCAN_INTERVAL_SECONDS", 120)
-DISCOVERY_LIMIT = env_int("DISCOVERY_LIMIT", 80)
-
-MIN_LIQUIDITY_USD = env_float("MIN_LIQUIDITY_USD", 20000.0)
-MIN_MC_USD = env_float("MIN_MC_USD", 10000.0)
-MAX_MC_USD = env_float("MAX_MC_USD", 3_000_000.0)
-MIN_LIQ_TO_MC = env_float("MIN_LIQ_TO_MC", 0.03)
-
-AGE_MIN_MINUTES = env_int("AGE_MIN_MINUTES", 10)
-AGE_MAX_MINUTES = env_int("AGE_MAX_MINUTES", 720)
-
-MAX_CANDIDATES_RANK = env_int("MAX_CANDIDATES_RANK", 40)
-
-# Quality gates
-MIN_ACCEL = env_float("MIN_ACCEL", 1.1)
-MIN_SCORE = env_float("MIN_SCORE", 0.15)
-
-PAPER_TRADING_ENABLED = env_bool("PAPER_TRADING_ENABLED", True)
-PAPER_MAX_OPEN = env_int("PAPER_MAX_OPEN", 6)
-
-PAPER_STOP_LOSS_PCT = env_float("PAPER_STOP_LOSS_PCT", -20.0)
-PAPER_TAKE_PROFIT_PCT = env_float("PAPER_TAKE_PROFIT_PCT", 40.0)
-PAPER_TRAIL_DROP_PCT = env_float("PAPER_TRAIL_DROP_PCT", 15.0)
-PAPER_MAX_HOLD_MIN = env_int("PAPER_MAX_HOLD_MIN", 180)
-
-# Live mirror controls (kept for later)
-LIVE_MIRROR_ENABLED = env_bool("LIVE_MIRROR_ENABLED", True)
-LIVE_SOL_PER_TRADE = env_float("MAX_SOL_PER_TRADE", 0.075)
-MAX_OPEN_LIVE_TRADES = env_int("MAX_OPEN_LIVE_TRADES", 5)
-
-LIVE_STOP_LOSS_PCT = env_float("LIVE_STOP_LOSS_PCT", -25.0)
-LIVE_TRAIL_DROP_PCT = env_float("LIVE_TRAIL_DROP_PCT", 18.0)
-LIVE_MAX_HOLD_MIN = env_int("LIVE_MAX_HOLD_MIN", 240)
-
-LIVE_TP1_PCT = env_float("LIVE_TP1_PCT", 25.0)
-LIVE_TP1_SELL_FRAC = env_float("LIVE_TP1_SELL_FRAC", 0.40)
-
-LIVE_TP2_PCT = env_float("LIVE_TP2_PCT", 60.0)
-LIVE_TP2_SELL_FRAC = env_float("LIVE_TP2_SELL_FRAC", 0.30)
-
-DAILY_LOSS_LIMIT_SOL = env_float("DAILY_LOSS_LIMIT_SOL", 0.15)
-MAX_CONSEC_LIVE_LOSSES = env_int("MAX_CONSEC_LIVE_LOSSES", 4)
-EMERGENCY_STOP_SOL_BAL = env_float("EMERGENCY_STOP_SOL_BAL", 0.25)
+from storage import Storage
+from llm import LLMScorer
+from trader import JupiterTrader
 
 
-def _num(x, default=0.0) -> float:
+log = logging.getLogger("scanner")
+logging.basicConfig(level=logging.INFO)
+
+# ============================================================
+# CONFIG
+# ============================================================
+
+DEXSCREENER_SEARCH_URL = "https://api.dexscreener.com/latest/dex/search"
+SOLANA_CHAIN_ID = "solana"
+
+SCAN_INTERVAL_SECONDS = int(os.getenv("SCAN_INTERVAL_SECONDS", "600"))
+MAX_NEW_PER_SCAN = int(os.getenv("MAX_NEW_PER_SCAN", "30"))
+
+MIN_LIQUIDITY_USD = float(os.getenv("MIN_LIQUIDITY_USD", "5000"))
+MAX_MC_USD = float(os.getenv("MAX_MC_USD", "5000000"))
+
+AGE_MIN_MINUTES = int(os.getenv("AGE_MIN_MINUTES", "10"))
+AGE_MAX_MINUTES = int(os.getenv("AGE_MAX_MINUTES", "1440"))
+
+MIN_ACCEL = float(os.getenv("MIN_ACCEL", "0.9"))
+MIN_SCORE = float(os.getenv("MIN_SCORE", "0.12"))
+
+LIVE_TRADING_ENABLED = os.getenv("LIVE_TRADING_ENABLED", "false").lower() == "true"
+
+# ============================================================
+# PLAYBOOK STATS (for Telegram scan messages)
+# ============================================================
+
+PLAYBOOK_PATH = os.getenv("PLAYBOOK_PATH", "playbook.json")
+
+
+def _load_playbook_json(path: str = PLAYBOOK_PATH) -> dict:
+    """Load playbook.json (best-effort). Returns {} if missing/bad."""
+    try:
+        if not os.path.exists(path):
+            return {}
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _compute_paper_trade_stats(playbook: dict) -> dict:
+    """Compute open/closed counts, win-rate, and average return% from playbook."""
+    open_trades = playbook.get("paper_trades") or playbook.get("paperTrades") or []
+    history = playbook.get("paper_trade_history") or playbook.get("paperTradeHistory") or []
+
+    # Some implementations store closed trades inside a generic list; keep this future-proof.
+    if not history and isinstance(playbook.get("trades"), list):
+        maybe = [t for t in playbook.get("trades", []) if str(t.get("mode", "")).upper() == "PAPER"]
+        history = maybe or playbook.get("trades", [])
+
+    closed = [t for t in history if isinstance(t, dict)]
+    wins = 0
+    returns = []
+
+    for t in closed:
+        result = str(t.get("result", t.get("outcome", ""))).upper()
+        if result.startswith("WIN") or result in {"TP", "PROFIT"}:
+            wins += 1
+
+        rp = t.get("return_pct", t.get("returnPercent", None))
+        if isinstance(rp, (int, float)) and math.isfinite(rp):
+            returns.append(float(rp))
+        else:
+            # Fallback: compute from prices if present
+            entry = t.get("entry_price", t.get("entryPrice"))
+            exitp = t.get("exit_price", t.get("exitPrice", t.get("close_price", t.get("closePrice"))))
+            if isinstance(entry, (int, float)) and isinstance(exitp, (int, float)) and entry:
+                returns.append((float(exitp) - float(entry)) / float(entry) * 100.0)
+
+    closed_n = len(closed)
+    win_rate = (wins / closed_n * 100.0) if closed_n else None
+    avg_return = (sum(returns) / len(returns)) if returns else None
+
+    return {
+        "open": len(open_trades) if isinstance(open_trades, list) else 0,
+        "pending": int(playbook.get("pending_paper", playbook.get("pendingPaper", 0)) or 0),
+        "closed": closed_n,
+        "wins": wins,
+        "win_rate": win_rate,
+        "avg_return": avg_return,
+    }
+
+
+def _format_pick_tracker_block(stats: dict) -> str:
+    """Return the PICK TRACKER block (or empty string if not enough data)."""
+    if not stats:
+        return ""
+
+    closed = stats.get("closed", 0) or 0
+    open_ = stats.get("open", 0) or 0
+    pending = stats.get("pending", 0) or 0
+
+    win_rate = stats.get("win_rate", None)
+    avg_return = stats.get("avg_return", None)
+
+    lines = []
+    lines.append("📋 PICK TRACKER UPDATE")
+    lines.append("===================================")
+    lines.append(f"Active: {open_} | Pending: {pending} | Closed: {closed}")
+    if win_rate is not None and avg_return is not None and closed:
+        lines.append(f"Win rate: {win_rate:.1f}% | Avg return: {avg_return:+.1f}%")
+    return "\n".join(lines)
+
+
+# ============================================================
+# HELPERS
+# ============================================================
+
+
+def now_utc():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def safe_float(x, default=0.0):
     try:
         return float(x)
     except Exception:
         return default
 
 
-def _safe_age_minutes(c: Dict[str, Any]) -> Optional[int]:
+def minutes_since(ts_ms: int) -> float:
+    # ts_ms in milliseconds
+    return (time.time() * 1000 - ts_ms) / 60000.0
+
+
+def compute_accel(pair: dict) -> float:
     """
-    FIXED:
-    - Returns None ONLY if missing/unparsable.
-    - Absurdly huge ages are NOT treated as unknown.
-      They will be rejected by AGE_MAX_MINUTES as "too old".
+    Basic 'acceleration' proxy:
+    - Use price change and volume change (if available) as a heuristic.
     """
-    raw = c.get("age_min", None)
-    if raw is None:
-        return None
-    try:
-        age = int(raw)
-        if age < 0:
-            return None
-        return age
-    except Exception:
-        return None
+    pc = safe_float(pair.get("priceChange", {}).get("h1", 0.0), 0.0)
+    vol = safe_float(pair.get("volume", {}).get("h1", 0.0), 0.0)
+    liq = safe_float((pair.get("liquidity") or {}).get("usd", 0.0), 0.0)
+    if liq <= 0:
+        return 0.0
+    return (abs(pc) / 100.0) + (vol / max(liq, 1.0))  # heuristic
 
 
-def filter_candidate(c: Dict[str, Any]) -> bool:
-    mint = c.get("mint")
-    if not mint or len(mint) < 20:
+def fetch_pairs(query: str):
+    url = f"{DEXSCREENER_SEARCH_URL}?q={query}"
+    r = requests.get(url, timeout=20)
+    r.raise_for_status()
+    data = r.json()
+    pairs = data.get("pairs", []) or []
+    # Filter to Solana
+    return [p for p in pairs if p.get("chainId") == SOLANA_CHAIN_ID]
+
+
+def is_pair_age_ok(pair: dict) -> bool:
+    created = pair.get("pairCreatedAt")
+    if not created:
         return False
-
-    liq = _num(c.get("liq"), 0.0)
-    mc = _num(c.get("mc"), 0.0)
-    liq_to_mc = _num(c.get("liq_to_mc"), 0.0)
-    accel = _num(c.get("vol_accel"), 0.0)
-
-    # Core safety filters
-    if liq < MIN_LIQUIDITY_USD:
-        return False
-    if mc < MIN_MC_USD or mc > MAX_MC_USD:
-        return False
-    if liq_to_mc < MIN_LIQ_TO_MC:
-        return False
-
-    # Momentum gate
-    if accel < MIN_ACCEL:
-        return False
-
-    # Age gate with robust handling:
-    age = _safe_age_minutes(c)
-
-    if age is None:
-        # Only missing/unparsable age can pass, and only if it's extra strong
-        if accel < (MIN_ACCEL * 1.3):
-            return False
-        if liq < (MIN_LIQUIDITY_USD * 2.0):
-            return False
-        return True
-
-    # If age exists, enforce strict window (this blocks 725246m etc.)
-    if age < AGE_MIN_MINUTES or age > AGE_MAX_MINUTES:
-        return False
-
-    return True
+    age_min = minutes_since(int(created))
+    return AGE_MIN_MINUTES <= age_min <= AGE_MAX_MINUTES
 
 
-def score_candidate(store: Storage, c: Dict[str, Any]) -> float:
-    w = (store.state.get("model") or {}).get("weights") or {}
-    w_vol = _num(w.get("vol_accel"), 0.40)
-    w_liq = _num(w.get("liq"), 0.25)
-    w_age = _num(w.get("age"), 0.20)
-    w_bp = _num(w.get("buy_pressure"), 0.15)
-
-    age = _safe_age_minutes(c)
-    liq = _num(c.get("liq"), 0.0)
-    accel = _num(c.get("vol_accel"), 0.0)
-    buys = int(c.get("buys_1h", 0) or 0)
-    sells = int(c.get("sells_1h", 0) or 0)
-    bp = buys / max(1, sells)
-
-    accel_n = min(1.0, max(0.0, (accel - 0.6) / 3.0))
-    liq_n = min(1.0, max(0.0, (liq - 20000.0) / 180000.0))
-
-    if age is None:
-        age_n = 0.4  # neutral-low to avoid "missing age wins"
-    else:
-        if age < 15:
-            age_n = 0.2
-        elif age <= 360:
-            age_n = 1.0
-        elif age <= 720:
-            age_n = 0.6
-        else:
-            age_n = 0.2
-
-    bp_n = min(1.0, max(0.0, (bp - 0.8) / 2.2))
-    base = (w_vol * accel_n) + (w_liq * liq_n) + (w_age * age_n) + (w_bp * bp_n)
-
-    buckets = make_feature_buckets(c)
-    edge = 0.0
-    for b in buckets:
-        edge += store.bucket_edge(b)
-    edge = max(-1.5, min(1.5, edge))
-
-    return base + 0.20 * edge
+def is_pair_liquidity_ok(pair: dict) -> bool:
+    liq = safe_float((pair.get("liquidity") or {}).get("usd", 0.0), 0.0)
+    return liq >= MIN_LIQUIDITY_USD
 
 
-def should_open_new_paper(store: Storage) -> bool:
-    if not PAPER_TRADING_ENABLED:
-        return False
-    return len(store.get_open_paper_trades()) < PAPER_MAX_OPEN
+def is_pair_mc_ok(pair: dict) -> bool:
+    fdv = safe_float(pair.get("fdv", 0.0), 0.0)
+    if fdv <= 0:
+        return True  # some pairs don't provide
+    return fdv <= MAX_MC_USD
 
 
-def _pnl_pct(entry: float, now: float) -> float:
-    return (now / max(1e-12, entry) - 1.0) * 100.0
+def get_pair_symbol(pair: dict) -> str:
+    base = (pair.get("baseToken") or {}).get("symbol") or "UNK"
+    return str(base).strip()
 
 
-def paper_exit_reason(trade: Dict[str, Any], now_price: float) -> Optional[str]:
-    entry = _num(trade.get("entry_price"), 0.0)
-    pnl = _pnl_pct(entry, now_price)
-    peak = _num(trade.get("peak_pnl_pct"), 0.0)
-    age_min = int((time.time() - int(trade.get("entry_ts", int(time.time())))) / 60)
-
-    if pnl <= PAPER_STOP_LOSS_PCT:
-        return "stop_loss"
-    if pnl >= PAPER_TAKE_PROFIT_PCT:
-        return "take_profit"
-    if peak >= 8.0 and (peak - pnl) >= PAPER_TRAIL_DROP_PCT:
-        return "trail_exit"
-    if age_min >= PAPER_MAX_HOLD_MIN:
-        return "time_exit"
-    return None
+def get_pair_mint(pair: dict) -> str:
+    base = (pair.get("baseToken") or {}).get("address") or ""
+    return str(base).strip()
 
 
-def run_forever():
-    setup_logging()
+# ============================================================
+# MAIN
+# ============================================================
 
-    tg = TelegramClient(env_str("TELEGRAM_BOT_TOKEN", ""), env_str("TELEGRAM_USER_ID", ""))
-    dex = DexScreenerClient()
+
+def main():
+    tg = TelegramClient()
     store = Storage()
-
-    tg.send("Bot restarted and running.")
+    llm = LLMScorer()
+    trader = JupiterTrader()
 
     while True:
         try:
-            store.increment_scan()
-            scan_id = int(store.state.get("scans", 0))
+            scan_start = time.time()
+            store.state["scans"] = int(store.state.get("scans", 0)) + 1
+            scan_id = store.state["scans"]
 
-            wallet = get_wallet_summary()
-            gate = store.evaluate_live_gate()
+            # Pull candidates
+            pairs = fetch_pairs("pump")  # broad query
+            random.shuffle(pairs)
+            pairs = pairs[: MAX_NEW_PER_SCAN * 3]  # extra for filtering
 
-            opened_msgs: List[str] = []
-            update_msgs: List[str] = []
-
-            # Paper monitoring
-            for t in store.get_open_paper_trades():
-                mint = t.get("mint")
-                if not mint:
+            candidates = []
+            for p in pairs:
+                if not is_pair_age_ok(p):
+                    continue
+                if not is_pair_liquidity_ok(p):
+                    continue
+                if not is_pair_mc_ok(p):
                     continue
 
-                tok = dex.get_token(mint)
-                price = _num(tok.get("price"), 0.0)
-                if price <= 0:
+                accel = compute_accel(p)
+                if accel < MIN_ACCEL:
                     continue
 
-                store.update_paper_trade_mark(t["id"], price)
-                reason = paper_exit_reason(t, price)
-                if reason:
-                    win, pnl2 = store.close_paper_trade(t["id"], price, reason)
-                    update_msgs.append(f"Paper closed {t['id']} pnl={pnl2:.2f}% reason={reason} win={win}")
+                candidates.append((p, accel))
 
-            discovered = discover_solana_candidates(limit=DISCOVERY_LIMIT)
+            # Score candidates via LLM
+            scored = []
+            for p, accel in candidates[:MAX_NEW_PER_SCAN]:
+                symbol = get_pair_symbol(p)
+                mint = get_pair_mint(p)
+                fdv = safe_float(p.get("fdv", 0.0), 0.0)
+                liq = safe_float((p.get("liquidity") or {}).get("usd", 0.0), 0.0)
 
-            candidates: List[Dict[str, Any]] = []
-            for c in discovered:
-                mint = c.get("mint")
-                if not mint:
+                score = llm.score_token(
+                    symbol=symbol,
+                    mint=mint,
+                    liquidity_usd=liq,
+                    fdv_usd=fdv,
+                    accel=accel,
+                    pair=p,
+                )
+
+                if score < MIN_SCORE:
                     continue
-                if store.is_blacklisted(mint):
-                    continue
-                if filter_candidate(c):
-                    c["score"] = score_candidate(store, c)
-                    c["buckets"] = make_feature_buckets(c)
-                    candidates.append(c)
 
-            candidates.sort(key=lambda x: _num(x.get("score"), 0.0), reverse=True)
+                scored.append(
+                    {
+                        "symbol": symbol,
+                        "mint": mint,
+                        "score": score,
+                        "accel": accel,
+                        "liq": liq,
+                        "fdv": fdv,
+                        "url": p.get("url", ""),
+                        "pair": p,
+                    }
+                )
 
-            ranked = [c for c in candidates if _num(c.get("score"), 0.0) >= MIN_SCORE]
-            ranked = ranked[:MAX_CANDIDATES_RANK]
+            scored.sort(key=lambda x: x["score"], reverse=True)
 
-            if ranked and should_open_new_paper(store):
-                top = ranked[0]
-                mint = top["mint"]
+            # Monitor paper trades
+            store.monitor_paper_trades()
 
-                already_open_paper = any(t.get("mint") == mint for t in store.get_open_paper_trades())
-                if not already_open_paper:
-                    tok = dex.get_token(mint)
-                    price = _num(tok.get("price"), 0.0)
-                    if price > 0:
-                        meta = {
-                            "symbol": top.get("symbol"),
-                            "score": top.get("score"),
-                            "age_min": top.get("age_min"),
-                            "liq": top.get("liq"),
-                            "mc": top.get("mc"),
-                            "liq_to_mc": top.get("liq_to_mc"),
-                            "vol_accel": top.get("vol_accel"),
-                            "buys_1h": top.get("buys_1h"),
-                            "sells_1h": top.get("sells_1h"),
-                            "url": top.get("url"),
-                            "buckets": top.get("buckets"),
-                        }
-                        tid = store.open_paper_trade(mint, price, meta)
-                        opened_msgs.append(
-                            f"Paper opened {tid} {mint[:6]} score={_num(top.get('score'),0):.3f} "
-                            f"age={top.get('age_min')}m liq=${_num(top.get('liq'),0):.0f} accel={_num(top.get('vol_accel'),0):.2f}"
-                        )
+            # Auto-open paper trades for top scored candidates
+            opened_msgs = []
+            for item in scored[:5]:
+                msg = store.try_open_paper_trade(item)
+                if msg:
+                    opened_msgs.append(msg)
 
-            store.save()
+            # Optional live gate + mirroring
+            live_msgs = []
+            if LIVE_TRADING_ENABLED and store.evaluate_live_gate():
+                live_msgs.append("LIVE gate: ✅ enabled (performance-gated)")
+                # If your implementation mirrors automatically, keep it there.
+                # Otherwise, you'd trigger trader actions here.
+            else:
+                live_msgs.append("LIVE gate: ❌ disabled (needs better paper performance)")
+
+            # Build Telegram message
+            top_lines = []
+            for i, x in enumerate(scored[:10], 1):
+                top_lines.append(
+                    f"{i:02d}. {x['symbol']} | score={x['score']:.3f} | accel={x['accel']:.3f} | liq=${x['liq']:.0f} | fdv=${x['fdv']:.0f}"
+                )
+
+            playbook_stats = _compute_paper_trade_stats(_load_playbook_json())
+            pick_tracker_block = _format_pick_tracker_block(playbook_stats)
 
             lines = [
                 f"Scan #{scan_id}",
-                f"Paper: open={len(store.get_open_paper_trades())} closed={(store.state.get('stats') or {}).get('paper', {}).get('closed', 0)}",
-                f"Gate: {gate.get('reason')}",
-                f"Wallet: {wallet.get('balance_sol')} SOL live_env={is_live_trading_enabled()} mirror={LIVE_MIRROR_ENABLED}",
-                f"Quality: MIN_ACCEL={MIN_ACCEL} MIN_SCORE={MIN_SCORE} age={AGE_MIN_MINUTES}-{AGE_MAX_MINUTES}m",
-                f"Candidates: discovered={len(discovered)} filtered={len(candidates)} ranked={len(ranked)}",
+                f"Candidates: {len(candidates)} | Scored: {len(scored)} | Filters: age {AGE_MIN_MINUTES}-{AGE_MAX_MINUTES}m, liq>={MIN_LIQUIDITY_USD}, mc<={MAX_MC_USD}, accel>={MIN_ACCEL}, score>={MIN_SCORE}",
+                f"Paper: open={playbook_stats.get('open', len(store.get_open_paper_trades()))} closed={playbook_stats.get('closed', (store.state.get('stats') or {}).get('paper', {}).get('closed', 0))}",
+                "",
+                "Top picks:",
+                *top_lines if top_lines else ["(none)"],
             ]
 
+            if pick_tracker_block:
+                lines.append("")
+                lines.append(pick_tracker_block)
+
             if opened_msgs:
-                lines.append("Actions:")
-                lines.extend(opened_msgs)
+                lines.append("")
+                lines.append("Opened paper trades:")
+                lines.extend([f"- {m}" for m in opened_msgs])
 
-            if update_msgs:
-                lines.append("Updates:")
-                lines.extend(update_msgs[:10])
+            if live_msgs:
+                lines.append("")
+                lines.append("Live trading:")
+                lines.extend([f"- {m}" for m in live_msgs])
 
-            if ranked:
-                lines.append("Top:")
-                for c in ranked[:3]:
-                    lines.append(
-                        f"{c.get('symbol','UNK')} {c.get('mint','')[:6]} score={_num(c.get('score'),0):.3f} "
-                        f"age={c.get('age_min')}m liq=${_num(c.get('liq'),0):.0f} accel={_num(c.get('vol_accel'),0):.2f}"
-                    )
+            msg = "\n".join(lines)
+            tg.send(msg)
 
-            tg.send("\n".join(lines))
+            store.save()
+
+            elapsed = time.time() - scan_start
+            sleep_for = max(0, SCAN_INTERVAL_SECONDS - elapsed)
+            time.sleep(sleep_for)
 
         except Exception as e:
-            log.exception(f"Scan loop error: {e}")
+            log.exception("Scan loop error: %s", e)
             try:
-                tg.send(f"Scan error: {str(e)[:180]}")
+                tg.send(f"Scanner error: {e}")
             except Exception:
                 pass
+            time.sleep(15)
 
-        jitter_sleep(SCAN_INTERVAL_SECONDS, 0.1)
+
+if __name__ == "__main__":
+    main()
