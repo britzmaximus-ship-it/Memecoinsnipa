@@ -64,21 +64,39 @@ def _load_playbook_json(path: str = PLAYBOOK_PATH) -> dict:
             return {}
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception:
+    except Exception as e:
+        log.warning("playbook load failed: %s", e)
         return {}
 
 
 def _compute_paper_trade_stats(playbook: dict) -> dict:
-    """Compute open/closed counts, win-rate, and average return% from playbook."""
+    """
+    Compute open/closed counts, win-rate, and average return% from playbook.
+    Best-effort across multiple possible key names.
+    """
+    if not isinstance(playbook, dict):
+        return {
+            "open": 0,
+            "pending": 0,
+            "closed": 0,
+            "wins": 0,
+            "win_rate": None,
+            "avg_return": None,
+        }
+
     open_trades = playbook.get("paper_trades") or playbook.get("paperTrades") or []
     history = playbook.get("paper_trade_history") or playbook.get("paperTradeHistory") or []
 
-    # Future-proof fallback if your schema differs
+    # Future-proof fallback if some versions store all trades together
     if not history and isinstance(playbook.get("trades"), list):
         maybe = [t for t in playbook.get("trades", []) if str(t.get("mode", "")).upper() == "PAPER"]
         history = maybe or playbook.get("trades", [])
 
+    # Normalize
+    open_n = len(open_trades) if isinstance(open_trades, list) else 0
     closed = [t for t in history if isinstance(t, dict)]
+    closed_n = len(closed)
+
     wins = 0
     returns = []
 
@@ -97,13 +115,18 @@ def _compute_paper_trade_stats(playbook: dict) -> dict:
             if isinstance(entry, (int, float)) and isinstance(exitp, (int, float)) and entry:
                 returns.append((float(exitp) - float(entry)) / float(entry) * 100.0)
 
-    closed_n = len(closed)
     win_rate = (wins / closed_n * 100.0) if closed_n else None
     avg_return = (sum(returns) / len(returns)) if returns else None
 
+    pending = playbook.get("pending_paper", playbook.get("pendingPaper", 0)) or 0
+    try:
+        pending = int(pending)
+    except Exception:
+        pending = 0
+
     return {
-        "open": len(open_trades) if isinstance(open_trades, list) else 0,
-        "pending": int(playbook.get("pending_paper", playbook.get("pendingPaper", 0)) or 0),
+        "open": open_n,
+        "pending": pending,
         "closed": closed_n,
         "wins": wins,
         "win_rate": win_rate,
@@ -113,18 +136,18 @@ def _compute_paper_trade_stats(playbook: dict) -> dict:
 
 def _format_pick_tracker_block(stats: dict) -> str:
     """Return the PICK TRACKER block (or empty string if not enough data)."""
-    if not stats:
+    if not isinstance(stats, dict):
         return ""
 
-    closed = stats.get("closed", 0) or 0
-    open_ = stats.get("open", 0) or 0
-    pending = stats.get("pending", 0) or 0
+    closed = int(stats.get("closed", 0) or 0)
+    open_ = int(stats.get("open", 0) or 0)
+    pending = int(stats.get("pending", 0) or 0)
 
     win_rate = stats.get("win_rate", None)
     avg_return = stats.get("avg_return", None)
 
     lines = []
-    lines.append("📋 PICK TRACKER UPDATE")
+    lines.append("PICK TRACKER UPDATE")
     lines.append("===================================")
     lines.append(f"Active: {open_} | Pending: {pending} | Closed: {closed}")
     if win_rate is not None and avg_return is not None and closed:
@@ -135,7 +158,6 @@ def _format_pick_tracker_block(stats: dict) -> str:
 # ============================================================
 # HELPERS
 # ============================================================
-
 
 def now_utc():
     return datetime.now(timezone.utc).isoformat()
@@ -160,7 +182,7 @@ def compute_accel(pair: dict) -> float:
     """
     pc = safe_float((pair.get("priceChange") or {}).get("h1", 0.0), 0.0)
     vol = safe_float((pair.get("volume") or {}).get("h1", 0.0), 0.0)
-    liq = safe_float(((pair.get("liquidity") or {}) or {}).get("usd", 0.0), 0.0)
+    liq = safe_float((pair.get("liquidity") or {}).get("usd", 0.0), 0.0)
     if liq <= 0:
         return 0.0
     return (abs(pc) / 100.0) + (vol / max(liq, 1.0))  # heuristic
@@ -180,7 +202,10 @@ def is_pair_age_ok(pair: dict) -> bool:
     created = pair.get("pairCreatedAt")
     if not created:
         return False
-    age_min = minutes_since(int(created))
+    try:
+        age_min = minutes_since(int(created))
+    except Exception:
+        return False
     return AGE_MIN_MINUTES <= age_min <= AGE_MAX_MINUTES
 
 
@@ -210,12 +235,11 @@ def get_pair_mint(pair: dict) -> str:
 # MAIN
 # ============================================================
 
-
 def main():
     tg = TelegramClient()
     store = Storage()
     llm = LLMScorer()
-    trader = JupiterTrader()  # keep constructed if you use it elsewhere
+    trader = JupiterTrader()  # kept for future live mirroring
 
     while True:
         try:
@@ -291,9 +315,9 @@ def main():
             # Optional live gate + mirroring
             live_msgs = []
             if LIVE_TRADING_ENABLED and store.evaluate_live_gate():
-                live_msgs.append("LIVE gate: ✅ enabled (performance-gated)")
+                live_msgs.append("LIVE gate: enabled (performance-gated)")
             else:
-                live_msgs.append("LIVE gate: ❌ disabled (needs better paper performance)")
+                live_msgs.append("LIVE gate: disabled (needs better paper performance)")
 
             # Build Telegram message
             top_lines = []
@@ -302,23 +326,28 @@ def main():
                     f"{i:02d}. {x['symbol']} | score={x['score']:.3f} | accel={x['accel']:.3f} | liq=${x['liq']:.0f} | fdv=${x['fdv']:.0f}"
                 )
 
-            playbook_stats = _compute_paper_trade_stats(_load_playbook_json())
+            # playbook stats (never let this crash the scan)
+            try:
+                playbook_stats = _compute_paper_trade_stats(_load_playbook_json())
+            except Exception as e:
+                log.warning("stats calc failed: %s", e)
+                playbook_stats = {"open": 0, "pending": 0, "closed": 0, "wins": 0, "win_rate": None, "avg_return": None}
+
+            try:
+                open_fallback = len(store.get_open_paper_trades())
+            except Exception:
+                open_fallback = 0
+
             pick_tracker_block = _format_pick_tracker_block(playbook_stats)
 
-            lines = []
-            lines.append(f"Scan #{scan_id}")
-            lines.append(
-                f"Candidates: {len(candidates)} | Scored: {len(scored)} | Filters: age {AGE_MIN_MINUTES}-{AGE_MAX_MINUTES}m, liq>={MIN_LIQUIDITY_USD}, mc<={MAX_MC_USD}, accel>={MIN_ACCEL}, score>={MIN_SCORE}"
-            )
-            lines.append(
-                f"Paper: open={playbook_stats.get('open', 0)} closed={playbook_stats.get('closed', 0)}"
-            )
-            lines.append("")
-            lines.append("Top picks:")
-            if top_lines:
-                lines.extend(top_lines)
-            else:
-                lines.append("(none)")
+            lines = [
+                f"Scan #{scan_id}",
+                f"Candidates: {len(candidates)} | Scored: {len(scored)} | Filters: age {AGE_MIN_MINUTES}-{AGE_MAX_MINUTES}m, liq>={MIN_LIQUIDITY_USD}, mc<={MAX_MC_USD}, accel>={MIN_ACCEL}, score>={MIN_SCORE}",
+                f"Paper: open={playbook_stats.get('open', open_fallback)} closed={playbook_stats.get('closed', 0)}",
+                "",
+                "Top picks:",
+                * (top_lines if top_lines else ["(none)"]),
+            ]
 
             if pick_tracker_block:
                 lines.append("")
@@ -336,11 +365,11 @@ def main():
 
             msg = "\n".join(lines)
 
-            # Send Telegram (don’t crash the loop if Telegram fails)
+            # If Telegram send fails, don't crash the whole bot
             try:
                 tg.send(msg)
-            except Exception as te:
-                log.exception("Telegram send failed: %s", te)
+            except Exception as e:
+                log.warning("telegram send failed: %s", e)
 
             store.save()
 
