@@ -1,58 +1,76 @@
+"""
+llm.py
+
+Safe LLM scoring wrapper for Memecoinsnipa.
+
+Exports:
+- class LLMScorer with method:
+    score_token(symbol, mint, liquidity_usd, fdv_usd, accel, pair) -> float
+
+Design goals:
+- NEVER crash the scanner loop (always returns a float)
+- Groq-first, OpenRouter fallback
+- Cooldown + min-time-between-calls throttling
+- If LLM unavailable, return a heuristic score instead
+"""
+
+import os
 import time
+import json
 import logging
-import re
 from typing import Optional, Dict, Any
 
-try:
-    import requests
-except Exception as e:
-    # If requests isn't installed, we don't want the whole bot to crash.
-    requests = None
+import requests
 
 log = logging.getLogger("memecoinsnipa.llm")
 
 
-# ============================================================
-# ENV HELPERS (safe fallback if utils.py is missing)
-# ============================================================
+def _env_str(name: str, default: str = "") -> str:
+    v = os.getenv(name)
+    return default if v is None else str(v).strip()
 
-def env_str(key: str, default: str = "") -> str:
-    import os
-    v = os.getenv(key)
-    return v.strip() if isinstance(v, str) and v.strip() else default
 
-def env_int(key: str, default: int = 0) -> int:
-    import os
-    v = os.getenv(key)
+def _env_int(name: str, default: int) -> int:
+    v = os.getenv(name)
     try:
-        return int(v) if v is not None else default
+        return int(str(v).strip()) if v is not None else int(default)
     except Exception:
-        return default
+        return int(default)
 
 
-# ============================================================
-# CORE LLM ENGINE
-# ============================================================
+def _env_float(name: str, default: float) -> float:
+    v = os.getenv(name)
+    try:
+        return float(str(v).strip()) if v is not None else float(default)
+    except Exception:
+        return float(default)
 
-class LLM:
+
+class LLMScorer:
     """
-    Groq-first with cooldown protection.
-    Optional OpenRouter fallback.
-    Never raises — returns None on failure.
+    Produces a numeric score in [0, 1] for each candidate.
     """
 
     def __init__(self):
-        self.groq_key = env_str("GROQ_API_KEY", "")
-        self.openrouter_key = env_str("OPENROUTER_API_KEY", "")
+        # Keys
+        self.groq_key = _env_str("GROQ_API_KEY", "")
+        self.openrouter_key = _env_str("OPENROUTER_API_KEY", "")
 
-        self.groq_model = env_str("GROQ_MODEL", "llama-3.3-70b-versatile")
-        self.openrouter_model = env_str("OPENROUTER_MODEL", "meta-llama/llama-3.1-8b-instruct")
+        # Models
+        self.groq_model = _env_str("GROQ_MODEL", "llama-3.3-70b-versatile")
+        self.openrouter_model = _env_str("OPENROUTER_MODEL", "meta-llama/llama-3.1-8b-instruct")
 
-        self.groq_cooldown = env_int("GROQ_COOLDOWN_SECONDS", 600)
-        self.min_seconds_between = env_int("LLM_MIN_SECONDS_BETWEEN_CALLS", 300)
+        # Throttling
+        self.groq_cooldown = _env_int("GROQ_COOLDOWN_SECONDS", 600)
+        self.min_seconds_between = _env_int("LLM_MIN_SECONDS_BETWEEN_CALLS", 120)
 
-        self.last_call = 0
-        self.cooldown_until = 0
+        # Runtime state
+        self.last_call = 0.0
+        self.cooldown_until = 0.0
+
+        # Hard safety: if Groq/OpenRouter keeps failing, don't spam
+        self.fail_streak = 0
+        self.fail_backoff_max = _env_int("LLM_FAIL_BACKOFF_MAX_SECONDS", 600)
 
     def _can_call(self) -> bool:
         now = time.time()
@@ -60,12 +78,91 @@ class LLM:
             return False
         if now - self.last_call < self.min_seconds_between:
             return False
+        # simple backoff after repeated failures
+        if self.fail_streak > 0:
+            backoff = min(self.fail_backoff_max, 10 * self.fail_streak)
+            if now - self.last_call < backoff:
+                return False
         return True
 
-    def _call_groq(self, prompt: str) -> Optional[str]:
-        if not self.groq_key or requests is None:
+    def _heuristic_score(
+        self,
+        liquidity_usd: float,
+        fdv_usd: float,
+        accel: float,
+        pair: Optional[Dict[str, Any]] = None,
+    ) -> float:
+        """
+        Returns a conservative score in [0,1] based on accel + liquidity + fdv.
+        This keeps the bot operating even with no LLM keys.
+        """
+        try:
+            liq = max(0.0, float(liquidity_usd))
+            fdv = max(0.0, float(fdv_usd))
+            a = max(0.0, float(accel))
+
+            # Normalize accel roughly: 0.9+ is good in your config
+            accel_component = min(1.0, a / 2.0)  # accel 2.0 -> 1.0
+
+            # Liquidity: 5k baseline; 50k+ is strong
+            liq_component = min(1.0, liq / 50000.0)
+
+            # FDV: lower is better; penalize big fdv (cap effect)
+            if fdv <= 0:
+                fdv_component = 0.6
+            else:
+                fdv_component = max(0.0, min(1.0, 1.0 - (fdv / 5_000_000.0)))
+
+            # Volume tilt if present
+            vol_h1 = 0.0
+            if isinstance(pair, dict):
+                vol_h1 = float(((pair.get("volume") or {}).get("h1") or 0.0))
+            vol_component = min(1.0, max(0.0, vol_h1 / 50000.0))  # 50k/h1 -> 1.0
+
+            score = (
+                0.45 * accel_component +
+                0.25 * liq_component +
+                0.20 * fdv_component +
+                0.10 * vol_component
+            )
+            return float(max(0.0, min(1.0, score)))
+        except Exception:
+            return 0.0
+
+    def _extract_score_from_text(self, text: str) -> Optional[float]:
+        """
+        Accepts outputs like:
+        'Score: 0.23'
+        '0.23'
+        'score=0.23'
+        """
+        try:
+            if not text:
+                return None
+            t = text.strip()
+            # try json first
+            if t.startswith("{"):
+                obj = json.loads(t)
+                v = obj.get("score")
+                if isinstance(v, (int, float)):
+                    return float(v)
+
+            # find first float-looking token
+            import re
+            m = re.search(r"(-?\d+(\.\d+)?)", t)
+            if not m:
+                return None
+            v = float(m.group(1))
+            # If model returns 0-100 scale, normalize
+            if v > 1.5:
+                v = v / 100.0
+            return float(max(0.0, min(1.0, v)))
+        except Exception:
             return None
 
+    def _call_groq(self, prompt: str) -> Optional[str]:
+        if not self.groq_key:
+            return None
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {"Authorization": f"Bearer {self.groq_key}", "Content-Type": "application/json"}
         payload = {
@@ -74,32 +171,27 @@ class LLM:
                 {"role": "system", "content": "Return ONLY a numeric score between 0 and 1."},
                 {"role": "user", "content": prompt},
             ],
-            "temperature": 0.3,
-            "max_tokens": 50,
+            "temperature": 0.2,
+            "max_tokens": 60,
         }
 
-        try:
-            r = requests.post(url, headers=headers, json=payload, timeout=20)
+        r = requests.post(url, headers=headers, json=payload, timeout=25)
 
-            if r.status_code == 429:
-                self.cooldown_until = time.time() + self.groq_cooldown
-                log.warning(f"Groq rate limited. Cooldown {self.groq_cooldown}s")
-                return None
-
-            if r.status_code != 200:
-                log.warning(f"Groq failed {r.status_code}: {r.text[:200]}")
-                return None
-
-            return r.json().get("choices", [{}])[0].get("message", {}).get("content")
-
-        except Exception as e:
-            log.warning(f"Groq exception: {e}")
+        if r.status_code == 429:
+            self.cooldown_until = time.time() + self.groq_cooldown
+            log.warning("Groq rate limited. Cooldown %ss", self.groq_cooldown)
             return None
+
+        if r.status_code != 200:
+            log.warning("Groq failed %s: %s", r.status_code, (r.text or "")[:200])
+            return None
+
+        data = r.json()
+        return data["choices"][0]["message"]["content"]
 
     def _call_openrouter(self, prompt: str) -> Optional[str]:
-        if not self.openrouter_key or requests is None:
+        if not self.openrouter_key:
             return None
-
         url = "https://openrouter.ai/api/v1/chat/completions"
         headers = {"Authorization": f"Bearer {self.openrouter_key}", "Content-Type": "application/json"}
         payload = {
@@ -108,60 +200,20 @@ class LLM:
                 {"role": "system", "content": "Return ONLY a numeric score between 0 and 1."},
                 {"role": "user", "content": prompt},
             ],
-            "temperature": 0.3,
-            "max_tokens": 50,
+            "temperature": 0.2,
+            "max_tokens": 60,
         }
 
-        try:
-            r = requests.post(url, headers=headers, json=payload, timeout=25)
-
-            if r.status_code == 429:
-                log.warning("OpenRouter rate limited.")
-                return None
-
-            if r.status_code != 200:
-                log.warning(f"OpenRouter failed {r.status_code}: {r.text[:200]}")
-                return None
-
-            return r.json().get("choices", [{}])[0].get("message", {}).get("content")
-
-        except Exception as e:
-            log.warning(f"OpenRouter exception: {e}")
+        r = requests.post(url, headers=headers, json=payload, timeout=30)
+        if r.status_code == 429:
+            log.warning("OpenRouter rate limited.")
+            return None
+        if r.status_code != 200:
+            log.warning("OpenRouter failed %s: %s", r.status_code, (r.text or "")[:200])
             return None
 
-    def analyze(self, payload: Dict[str, Any]) -> Optional[str]:
-        if not self._can_call():
-            return None
-
-        prompt = f"Token payload:\n{payload}\n\nReturn only a score between 0 and 1."
-
-        out = self._call_groq(prompt)
-        if out:
-            self.last_call = time.time()
-            return out
-
-        out = self._call_openrouter(prompt)
-        if out:
-            self.last_call = time.time()
-            return out
-
-        return None
-
-
-# ============================================================
-# SCANNER-COMPAT WRAPPER
-# ============================================================
-
-class LLMScorer:
-    """
-    scanner.py expects:
-      from llm import LLMScorer
-      score = llm.score_token(...)
-    Always returns float. Never crashes.
-    """
-
-    def __init__(self):
-        self.llm = LLM()
+        data = r.json()
+        return data["choices"][0]["message"]["content"]
 
     def score_token(
         self,
@@ -170,35 +222,58 @@ class LLMScorer:
         liquidity_usd: float,
         fdv_usd: float,
         accel: float,
-        pair: dict,
+        pair: Optional[Dict[str, Any]] = None,
     ) -> float:
-        payload = {
-            "symbol": symbol,
-            "mint": mint,
-            "liquidity_usd": liquidity_usd,
-            "fdv_usd": fdv_usd,
-            "accel": accel,
-        }
-
+        """
+        Always returns a float score (0..1). Never raises.
+        """
         try:
-            text = self.llm.analyze(payload)
-            if not text:
-                return 0.0
+            # If we can't call LLM, return heuristic
+            if not self._can_call():
+                return self._heuristic_score(liquidity_usd, fdv_usd, accel, pair)
 
-            nums = re.findall(r"(\d+(?:\.\d+)?)", str(text))
-            if not nums:
-                return 0.0
+            payload = {
+                "symbol": symbol,
+                "mint": mint,
+                "liquidity_usd": liquidity_usd,
+                "fdv_usd": fdv_usd,
+                "accel": accel,
+                "price_usd": (pair or {}).get("priceUsd"),
+                "priceChange": (pair or {}).get("priceChange", {}),
+                "volume": (pair or {}).get("volume", {}),
+                "txns": (pair or {}).get("txns", {}),
+            }
 
-            val = float(nums[0])
+            prompt = (
+                "Given this Solana memecoin pair snapshot, output a SINGLE numeric score 0..1.\n"
+                "Higher = better short-term trade candidate.\n\n"
+                f"{json.dumps(payload, ensure_ascii=False)}"
+            )
 
-            # normalize common formats
-            if val > 10:
-                val = val / 100.0
-            elif val > 1.5:
-                val = val / 10.0
+            # Groq first
+            result = self._call_groq(prompt)
+            if result:
+                self.last_call = time.time()
+                score = self._extract_score_from_text(result)
+                if score is not None:
+                    self.fail_streak = 0
+                    return score
 
-            return max(0.0, min(val, 1.0))
+            # OpenRouter fallback
+            result = self._call_openrouter(prompt)
+            if result:
+                self.last_call = time.time()
+                score = self._extract_score_from_text(result)
+                if score is not None:
+                    self.fail_streak = 0
+                    return score
+
+            # If both fail, mark fail and return heuristic
+            self.last_call = time.time()
+            self.fail_streak += 1
+            return self._heuristic_score(liquidity_usd, fdv_usd, accel, pair)
 
         except Exception as e:
-            log.warning(f"LLM scoring error: {e}")
-            return 0.0
+            # Hard fail-safe: never crash scanner
+            log.exception("LLMScorer.score_token error: %s", e)
+            return self._heuristic_score(liquidity_usd, fdv_usd, accel, pair)
