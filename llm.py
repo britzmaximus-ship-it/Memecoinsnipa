@@ -1,65 +1,46 @@
-"""
-llm.py
-
-Safe LLM wrapper + scorer for Memecoinsnipa.
-
-Exports:
-- class LLM         (analyze(payload) -> text or None)
-- class LLMScorer   (score_token(...) -> float 0..1)
-
-Design goals:
-- NEVER crash the scanner loop (always return something)
-- Groq-first, OpenRouter fallback
-- Cooldown + min-time-between-calls throttling
-- If LLM unavailable, return a heuristic score
-"""
-
-import os
-import re
 import time
-import json
 import logging
+import requests
+import re
 from typing import Optional, Dict, Any
 
-import requests
+# If you have utils.py, we use it. If not, we fallback safely.
+try:
+    from utils import env_str, env_int
+except Exception:
+    import os
+
+    def env_str(name: str, default: str = "") -> str:
+        v = os.getenv(name)
+        return default if v is None else str(v).strip()
+
+    def env_int(name: str, default: int = 0) -> int:
+        try:
+            return int(env_str(name, str(default)))
+        except Exception:
+            return default
+
 
 log = logging.getLogger("memecoinsnipa.llm")
-
-
-def _env_str(name: str, default: str = "") -> str:
-    v = os.getenv(name)
-    return default if v is None else str(v).strip()
-
-
-def _env_int(name: str, default: int) -> int:
-    try:
-        return int(os.getenv(name, str(default)))
-    except Exception:
-        return default
-
-
-def _env_float(name: str, default: float) -> float:
-    try:
-        return float(os.getenv(name, str(default)))
-    except Exception:
-        return default
 
 
 class LLM:
     """
     Groq-first with cooldown protection.
-    Optionally supports OpenRouter if OPENROUTER_API_KEY is set.
+    (Optionally supports OpenRouter if you set OPENROUTER_API_KEY)
+
+    Exports: class LLM
     """
 
     def __init__(self):
-        self.groq_key = _env_str("GROQ_API_KEY", "")
-        self.openrouter_key = _env_str("OPENROUTER_API_KEY", "")
+        self.groq_key = env_str("GROQ_API_KEY", "")
+        self.openrouter_key = env_str("OPENROUTER_API_KEY", "")
 
-        self.groq_model = _env_str("GROQ_MODEL", "llama-3.3-70b-versatile")
-        self.openrouter_model = _env_str("OPENROUTER_MODEL", "meta-llama/llama-3.1-8b-instruct")
+        self.groq_model = env_str("GROQ_MODEL", "llama-3.3-70b-versatile")
+        self.openrouter_model = env_str("OPENROUTER_MODEL", "meta-llama/llama-3.1-8b-instruct")
 
-        self.groq_cooldown = _env_int("GROQ_COOLDOWN_SECONDS", 600)
-        self.min_seconds_between = _env_int("LLM_MIN_SECONDS_BETWEEN_CALLS", 300)
+        self.groq_cooldown = env_int("GROQ_COOLDOWN_SECONDS", 600)
+        self.min_seconds_between = env_int("LLM_MIN_SECONDS_BETWEEN_CALLS", 300)
 
         self.last_call = 0.0
         self.cooldown_until = 0.0
@@ -92,17 +73,14 @@ class LLM:
 
         if r.status_code == 429:
             self.cooldown_until = time.time() + self.groq_cooldown
-            log.warning("Groq rate limited. Cooldown=%ss", self.groq_cooldown)
+            log.warning("Groq rate limited. Cooldown %ss", self.groq_cooldown)
             return None
 
         if r.status_code != 200:
             log.warning("Groq failed %s: %s", r.status_code, r.text[:200])
             return None
 
-        try:
-            return r.json()["choices"][0]["message"]["content"]
-        except Exception:
-            return None
+        return r.json()["choices"][0]["message"]["content"]
 
     def _call_openrouter(self, prompt: str) -> Optional[str]:
         if not self.openrouter_key:
@@ -130,10 +108,7 @@ class LLM:
             log.warning("OpenRouter failed %s: %s", r.status_code, r.text[:200])
             return None
 
-        try:
-            return r.json()["choices"][0]["message"]["content"]
-        except Exception:
-            return None
+        return r.json()["choices"][0]["message"]["content"]
 
     def analyze(self, payload: Dict[str, Any]) -> Optional[str]:
         """
@@ -144,8 +119,8 @@ class LLM:
 
         prompt = (
             "Analyze these candidates and pick the best 1-3 with short reasoning.\n\n"
-            f"{json.dumps(payload, ensure_ascii=False)}\n\n"
-            "Also include a single line: SCORE=<number between 0 and 1> for the best candidate."
+            f"{payload}\n\n"
+            "Return your answer in plain text."
         )
 
         # Groq first
@@ -165,48 +140,14 @@ class LLM:
 
 class LLMScorer:
     """
-    Safe scorer wrapper. Always returns a float score (0..1).
-    If LLM unavailable, returns a heuristic score.
+    Backwards-compatible wrapper that many versions of your scanner expect.
+
+    Exports: class LLMScorer with:
+      - score_token(...)
     """
 
     def __init__(self):
         self.llm = LLM()
-
-        # heuristic knobs
-        self.heur_liq_ref = _env_float("HEUR_LIQ_REF", 15000.0)
-        self.heur_fdv_ref = _env_float("HEUR_FDV_REF", 1000000.0)
-
-    def _parse_score_0_1(self, text: str) -> Optional[float]:
-        if not text:
-            return None
-
-        # Look for explicit SCORE=
-        m = re.search(r"SCORE\s*=\s*([01](?:\.\d+)?)", text, re.IGNORECASE)
-        if m:
-            try:
-                v = float(m.group(1))
-                return max(0.0, min(1.0, v))
-            except Exception:
-                pass
-
-        # fallback: first float between 0 and 1 in text
-        m2 = re.search(r"\b0\.\d+\b|\b1\.0+\b|\b1\b", text)
-        if m2:
-            try:
-                v = float(m2.group(0))
-                return max(0.0, min(1.0, v))
-            except Exception:
-                pass
-
-        return None
-
-    def _heuristic(self, liquidity_usd: float, fdv_usd: float, accel: float) -> float:
-        # simple bounded heuristic
-        liq_part = min(1.0, max(0.0, liquidity_usd / max(self.heur_liq_ref, 1.0)))
-        fdv_part = 1.0 - min(1.0, max(0.0, fdv_usd / max(self.heur_fdv_ref, 1.0))) if fdv_usd > 0 else 0.6
-        accel_part = min(1.0, max(0.0, accel / 2.0))
-        score = (0.45 * accel_part) + (0.35 * liq_part) + (0.20 * fdv_part)
-        return max(0.0, min(1.0, score))
 
     def score_token(
         self,
@@ -215,8 +156,13 @@ class LLMScorer:
         liquidity_usd: float,
         fdv_usd: float,
         accel: float,
-        pair: Dict[str, Any],
+        pair: Optional[Dict[str, Any]] = None,
     ) -> float:
+        """
+        Returns a numeric score in [0,1]ish.
+        - If LLM not available, returns a simple heuristic score.
+        - NEVER raises (so scanner won't crash).
+        """
         try:
             payload = {
                 "symbol": symbol,
@@ -224,22 +170,35 @@ class LLMScorer:
                 "liquidity_usd": liquidity_usd,
                 "fdv_usd": fdv_usd,
                 "accel": accel,
-                "pair_hint": {
-                    "url": pair.get("url"),
-                    "priceChange_h1": (pair.get("priceChange") or {}).get("h1"),
-                    "volume_h1": (pair.get("volume") or {}).get("h1"),
-                    "buys_h1": (pair.get("txns") or {}).get("h1", {}).get("buys"),
-                    "sells_h1": (pair.get("txns") or {}).get("h1", {}).get("sells"),
-                },
+                "pair_url": (pair or {}).get("url") if isinstance(pair, dict) else None,
             }
 
             text = self.llm.analyze(payload)
-            parsed = self._parse_score_0_1(text or "")
-            if parsed is not None:
-                return parsed
+            if not text:
+                return self._heuristic(liquidity_usd, fdv_usd, accel)
 
+            # Try to extract a number like "score: 0.18" or "0.22"
+            m = re.search(r"score[^0-9]*([0-9]*\.?[0-9]+)", text, re.IGNORECASE)
+            if not m:
+                m = re.search(r"([0-9]*\.?[0-9]+)", text)
+            if not m:
+                return self._heuristic(liquidity_usd, fdv_usd, accel)
+
+            val = float(m.group(1))
+            # clamp to sane range
+            if val < 0:
+                val = 0.0
+            if val > 1.0:
+                # some LLMs might output 1-10, normalize roughly
+                val = min(1.0, val / 10.0)
+            return val
+        except Exception:
             return self._heuristic(liquidity_usd, fdv_usd, accel)
 
-        except Exception as e:
-            log.warning("LLMScorer error: %s", e)
-            return self._heuristic(liquidity_usd, fdv_usd, accel)
+    @staticmethod
+    def _heuristic(liquidity_usd: float, fdv_usd: float, accel: float) -> float:
+        # Simple, stable fallback that won't crash:
+        liq_score = min(1.0, max(0.0, liquidity_usd / 50000.0))  # 50k liq ~ 1.0
+        fdv_score = 1.0 if fdv_usd <= 0 else min(1.0, max(0.0, 1.0 - (fdv_usd / 5_000_000.0)))  # under 5M better
+        accel_score = min(1.0, max(0.0, accel / 2.0))  # accel 2.0 ~ 1.0
+        return 0.45 * accel_score + 0.35 * liq_score + 0.20 * fdv_score
