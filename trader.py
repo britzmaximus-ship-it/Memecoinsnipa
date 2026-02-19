@@ -9,6 +9,9 @@ Exports:
 - sell_token_pct(mint_address, pct)     # sells pct (0..1)
 - sell_token_amount_raw(mint_address, raw_amount)  # sells raw amount
 
+Also provides:
+- class JupiterTrader (wrapper) for compatibility with scanner.py imports
+
 Env:
 - LIVE_TRADING_ENABLED=true/false
 - SOLANA_RPC_URL
@@ -26,7 +29,7 @@ import time
 import json
 import base64
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import requests
 import base58
@@ -154,7 +157,11 @@ def jupiter_swap(
 
         tx_b64 = swap_data.get("swapTransaction")
         if not tx_b64:
-            return {"success": False, "signature": None, "error": f"No swapTransaction returned: {str(swap_data)[:250]}"}
+            return {
+                "success": False,
+                "signature": None,
+                "error": f"No swapTransaction returned: {str(swap_data)[:250]}",
+            }
 
         vt = VersionedTransaction.from_bytes(base64.b64decode(tx_b64))
         sig = wallet.sign_message(bytes(vt.message))
@@ -272,3 +279,41 @@ def sell_token_pct(mint_address: str, pct: float) -> Dict[str, Any]:
 
 def sell_token(mint_address: str) -> Dict[str, Any]:
     return sell_token_pct(mint_address, 1.0)
+
+
+# ============================================================
+# Compatibility wrapper for scanner.py
+# ============================================================
+
+class JupiterTrader:
+    """
+    Thin wrapper so code can do:
+        from trader import JupiterTrader
+        trader = JupiterTrader()
+        trader.buy_token(...)
+    while keeping your existing functional API intact.
+    """
+
+    def __init__(self):
+        # Keep these on the instance in case you want to override per-trader later.
+        self.default_slippage_bps = DEFAULT_SLIPPAGE_BPS
+
+    def is_live_trading_enabled(self) -> bool:
+        return is_live_trading_enabled()
+
+    def get_wallet_summary(self) -> Dict[str, Any]:
+        return get_wallet_summary()
+
+    def buy_token(self, mint_address: str, sol_amount: float, slippage_bps: Optional[int] = None) -> Dict[str, Any]:
+        # Note: your current buy_token() does not accept slippage override; this wrapper keeps signature flexible.
+        # If you later want slippage overrides, we can thread it through jupiter_swap.
+        return buy_token(mint_address, sol_amount)
+
+    def sell_token(self, mint_address: str) -> Dict[str, Any]:
+        return sell_token(mint_address)
+
+    def sell_token_pct(self, mint_address: str, pct: float) -> Dict[str, Any]:
+        return sell_token_pct(mint_address, pct)
+
+    def sell_token_amount_raw(self, mint_address: str, raw_amount: int) -> Dict[str, Any]:
+        return sell_token_amount_raw(mint_address, raw_amount)
