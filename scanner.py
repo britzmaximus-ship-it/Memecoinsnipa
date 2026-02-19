@@ -358,3 +358,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+    def run_forever():
+    # run.py expects this symbol
+    main()
